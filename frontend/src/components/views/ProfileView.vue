@@ -8,6 +8,8 @@ import InputText from "primevue/inputtext";
 import Select from "primevue/select";
 import Button from "primevue/button";
 import SequenceEditor from "../SequenceEditor.vue";
+import TemplateInput from "../TemplateInput.vue";
+import { buildVariables } from "../../variables.js";
 import { useProfiles } from "../../stores/profiles.js";
 import { ipc } from "../../ipc.js";
 import { assignIds, stripIds, newNode } from "../../nodes.js";
@@ -16,6 +18,9 @@ const props = defineProps({ profileId: { type: String, required: true } });
 
 const { t, te } = useI18n();
 const plugins = inject("plugins", ref([]));
+// State variables for the filter field's `@` autocomplete — same catalogue as
+// the action config fields, so `@obs.scene` is offered here too.
+const variables = computed(() => buildVariables(plugins.value, t, te));
 const store = useProfiles();
 
 const draft = ref(null);
@@ -195,7 +200,13 @@ async function testSelected() {
         </div>
         <div class="field grow">
           <label>{{ t("core.profiles.filter") }}</label>
-          <InputText v-model="selected.filter" :placeholder="t('core.profiles.filterPlaceholder')" class="mono" />
+          <TemplateInput
+            expression
+            :variables="variables"
+            :modelValue="selected.filter ?? ''"
+            :placeholder="t('core.profiles.filterPlaceholder')"
+            @update:modelValue="selected.filter = $event"
+          />
         </div>
       </div>
 

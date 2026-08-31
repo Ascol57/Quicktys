@@ -210,6 +210,13 @@ with no message. Because deps are ROOT identifiers (`obs`) while state keys are 
 would have made `wait-for until` never wake. Tests: `eval.rs::dotted_state_keys_are_readable_as_paths`,
 `profile.rs::filter_reads_dotted_plugin_state`,
 `sequence_tests.rs::if_condition_reads_dotted_state_with_and_without_the_sigil`.
+In the editor, **every expression field uses `TemplateInput` with the `expression` prop** —
+the trigger filter (`ProfileView.vue`) and the 10 in `AutomationNode.vue` (`if`/`while`/`until`
+conditions, `switch` value, `repeat` count, `for-each` list, `delay` ms, `let`/`set`/`return`
+value). They were plain `InputText`, so `@obs.` autocompleted nothing and the user had to guess
+the variable names. Expression mode drops the `{{ }}` highlighting and helper menu (invalid in
+Rhai) and lets `@` follow an operator or paren, not just whitespace. The `equals (JSON)` case
+field stays an `InputText` — it is JSON, not an expression.
 
 The editor renders template string fields (`schema.template`) with a highlighted
 `@`/`{{`-autocomplete input (`TemplateInput.vue`; helper catalogue in `helpers.js`), fed by each plugin's declared `state` variables

@@ -6,8 +6,11 @@ import Select from "primevue/select";
 import InputText from "primevue/inputtext";
 import InputNumber from "primevue/inputnumber";
 import Button from "primevue/button";
+import { useI18n } from "vue-i18n";
 import SchemaForm from "./SchemaForm.vue";
 import NodePalette from "./NodePalette.vue";
+import TemplateInput from "./TemplateInput.vue";
+import { buildVariables } from "../variables.js";
 import { ipc } from "../ipc.js";
 import {
   newNode,
@@ -32,6 +35,12 @@ const emit = defineEmits(["update:node", "remove", "duplicate"]);
 
 const collapsed = ref(false);
 const patch = (partial) => emit("update:node", { ...props.node, ...partial });
+
+// State variables offered by the `@` autocomplete in every expression field
+// (conditions, counts, iterables) — the same catalogue the action config fields
+// use, so one syntax and one picker everywhere.
+const { t, te } = useI18n();
+const variables = computed(() => buildVariables(props.plugins ?? [], t, te));
 
 // --- list helpers (body / branches) ---------------------------------------
 const list = (key) => props.node[key] ?? [];
@@ -166,20 +175,20 @@ const hasChildren = computed(() => !["break", "continue"].includes(props.node.ki
       <template v-else-if="node.kind === 'let'">
         <div class="row">
           <span><label>Name</label><InputText :modelValue="node.name" @update:modelValue="patch({ name: $event })" /></span>
-          <span><label>Value (expr)</label><InputText class="mono" :modelValue="node.value" @update:modelValue="patch({ value: $event })" /></span>
+          <span><label>Value (expr)</label><TemplateInput expression :variables="variables" :modelValue="node.value" @update:modelValue="patch({ value: $event })" /></span>
         </div>
       </template>
       <template v-else-if="node.kind === 'set'">
         <div class="row">
           <span><label>Target</label><InputText :modelValue="node.target" @update:modelValue="patch({ target: $event })" /></span>
-          <span><label>Value (expr)</label><InputText class="mono" :modelValue="node.value" @update:modelValue="patch({ value: $event })" /></span>
+          <span><label>Value (expr)</label><TemplateInput expression :variables="variables" :modelValue="node.value" @update:modelValue="patch({ value: $event })" /></span>
         </div>
       </template>
 
       <!-- RETURN -->
       <template v-else-if="node.kind === 'return'">
         <label>Value (expr, optional)</label>
-        <InputText class="mono" :modelValue="node.value ?? ''" @update:modelValue="patch({ value: $event || undefined })" />
+        <TemplateInput expression :variables="variables" :modelValue="node.value ?? ''" @update:modelValue="patch({ value: $event || undefined })" />
       </template>
 
       <!-- WAIT-FOR -->
@@ -191,11 +200,11 @@ const hasChildren = computed(() => !["break", "continue"].includes(props.node.ki
         />
         <template v-if="node.wait === 'delay'">
           <label>Duration (ms, expr)</label>
-          <InputText class="mono" :modelValue="node.ms" @update:modelValue="patch({ ms: $event })" />
+          <TemplateInput expression :variables="variables" :modelValue="node.ms" @update:modelValue="patch({ ms: $event })" />
         </template>
         <template v-else-if="node.wait === 'until'">
           <label>Condition (expr)</label>
-          <InputText class="mono" :modelValue="node.cond" @update:modelValue="patch({ cond: $event })" />
+          <TemplateInput expression :variables="variables" :modelValue="node.cond" @update:modelValue="patch({ cond: $event })" />
           <label>Timeout ms (optional)</label>
           <InputNumber :modelValue="node.timeout_ms" @update:modelValue="patch({ timeout_ms: $event ?? undefined })" />
         </template>
@@ -210,7 +219,7 @@ const hasChildren = computed(() => !["break", "continue"].includes(props.node.ki
       <!-- IF -->
       <template v-else-if="node.kind === 'if'">
         <label>Condition (expr)</label>
-        <InputText class="mono" :modelValue="node.cond" @update:modelValue="patch({ cond: $event })" />
+        <TemplateInput expression :variables="variables" :modelValue="node.cond" @update:modelValue="patch({ cond: $event })" />
         <div class="branch"><span class="branch__label">then</span>
           <AutomationNode :node="node.then" :plugins="plugins" @update:node="patch({ then: $event })" @remove="patch({ then: newNode('block') })" />
         </div>
@@ -223,7 +232,7 @@ const hasChildren = computed(() => !["break", "continue"].includes(props.node.ki
       <!-- SWITCH -->
       <template v-else-if="node.kind === 'switch'">
         <label>Value (expr)</label>
-        <InputText class="mono" :modelValue="node.value" @update:modelValue="patch({ value: $event })" />
+        <TemplateInput expression :variables="variables" :modelValue="node.value" @update:modelValue="patch({ value: $event })" />
         <draggable v-model="casesProxy" item-key="_id" handle=".drag" :animation="150" class="children">
           <template #item="{ element, index }">
             <div class="case">
@@ -247,14 +256,14 @@ const hasChildren = computed(() => !["break", "continue"].includes(props.node.ki
         <Select :modelValue="node.loop" :options="['repeat', 'while', 'for-each']" @update:modelValue="emit('update:node', setLoopMode(node, $event))" />
         <div class="row">
           <template v-if="node.loop === 'repeat'">
-            <span><label>Count (expr)</label><InputText class="mono" :modelValue="node.count" @update:modelValue="patch({ count: $event })" /></span>
+            <span><label>Count (expr)</label><TemplateInput expression :variables="variables" :modelValue="node.count" @update:modelValue="patch({ count: $event })" /></span>
           </template>
           <template v-else-if="node.loop === 'while'">
-            <span><label>Condition (expr)</label><InputText class="mono" :modelValue="node.cond" @update:modelValue="patch({ cond: $event })" /></span>
+            <span><label>Condition (expr)</label><TemplateInput expression :variables="variables" :modelValue="node.cond" @update:modelValue="patch({ cond: $event })" /></span>
           </template>
           <template v-else>
             <span><label>Var</label><InputText :modelValue="node.var" @update:modelValue="patch({ var: $event })" /></span>
-            <span><label>List (expr)</label><InputText class="mono" :modelValue="node.list" @update:modelValue="patch({ list: $event })" /></span>
+            <span><label>List (expr)</label><TemplateInput expression :variables="variables" :modelValue="node.list" @update:modelValue="patch({ list: $event })" /></span>
           </template>
           <span><label>Max</label><InputNumber :modelValue="node.max" @update:modelValue="patch({ max: $event })" /></span>
         </div>

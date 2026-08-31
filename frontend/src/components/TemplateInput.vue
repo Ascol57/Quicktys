@@ -9,6 +9,12 @@ const props = defineProps({
   modelValue: { type: String, default: "" },
   variables: { type: Array, default: () => [] }, // [{ id, name, plugin, icon, color }]
   placeholder: { type: String, default: "" },
+  // Expression mode: the field holds a Rhai condition/value (an `if`, a loop, a
+  // trigger filter), not a template string. `{{ }}` is NOT valid syntax there,
+  // so no Handlebars highlighting and no helper autocomplete — but `@var` is
+  // accepted by the host's expression compiler, and may follow an operator or a
+  // paren rather than only whitespace.
+  expression: { type: Boolean, default: false },
 });
 const emit = defineEmits(["update:modelValue"]);
 
@@ -19,14 +25,17 @@ const highlightRef = ref(null);
 // host resolver) and `{{ … }}` Handlebars regions.
 // An escape `\x` (consumed first, so `\@`/`\{{` are not tokens); a `@path`
 // (start or after whitespace); or a non-escaped `{{ … }}` region.
-const TOKEN = /\\[\s\S]|(?<=^|\s)@[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*|(?<!\\)\{\{[^}]*\}\}?/g;
+const TOKEN_TEMPLATE = /\\[\s\S]|(?<=^|\s)@[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*|(?<!\\)\{\{[^}]*\}\}?/g;
+// Expressions: variables only, anywhere (`(@obs.scene == "x")`).
+const TOKEN_EXPR = /@[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*/g;
+const TOKEN = computed(() => (props.expression ? TOKEN_EXPR : TOKEN_TEMPLATE));
 const escapeHtml = (s) =>
   s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
 const highlighted = computed(() => {
   const text = props.modelValue ?? "";
   let html = "";
   let last = 0;
-  for (const m of text.matchAll(TOKEN)) {
+  for (const m of text.matchAll(TOKEN.value)) {
     const tok = m[0];
     html += escapeHtml(text.slice(last, m.index));
     if (tok[0] === "\\") {
@@ -87,11 +96,18 @@ function onInput(e) {
 function updateMenu() {
   const ta = taRef.value;
   const upto = ta.value.slice(0, ta.selectionStart);
-  // `@variable`
-  const at = upto.match(/(?:^|\s)@([A-Za-z0-9_.-]*)$/);
+  // `@variable` — in an expression the sigil may follow `(`, `!`, `&&`, …
+  const at = upto.match(
+    props.expression ? /@([A-Za-z0-9_.-]*)$/ : /(?:^|\s)@([A-Za-z0-9_.-]*)$/,
+  );
   if (at) {
     menu.value = { open: true, mode: "var", query: at[1], from: ta.selectionStart - at[1].length - 1 };
     active.value = 0;
+    return;
+  }
+  // `{{ }}` is template-only syntax; an expression field must not offer it.
+  if (props.expression) {
+    menu.value.open = false;
     return;
   }
   // Inside an unclosed, non-escaped `{{ … }}` → helper / variable.
