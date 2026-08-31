@@ -111,7 +111,7 @@
     "twitchOpenPage": "Ouvrir la page",
     "twitchEnterCode": "Saisis ce code sur Twitch pour autoriser Quicktys :",
     "twitchWaiting": "En attente de ta validation… cette fenêtre se met à jour toute seule.",
-    "twitchHint": "Enregistre une application sur dev.twitch.tv/console/apps pour obtenir un Client ID (type de client : public — aucun secret requis). Le code peut aussi être saisi depuis ton téléphone."
+    "twitchHint": "Enregistre une application sur dev.twitch.tv/console/apps et colle son Client ID ici. L'URL de redirection demandée par le formulaire n'est jamais utilisée par ce flux — http://localhost convient. Aucun client secret n'est nécessaire. Le code peut aussi être saisi depuis ton téléphone."
   },
   "marketplace": {
     "tab": {

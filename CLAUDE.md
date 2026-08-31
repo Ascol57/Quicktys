@@ -261,7 +261,9 @@ cannot ship in a distributed binary, and Implicit returns no refresh token; devi
 only a public `client_id`, refreshes, and needs no loopback server or redirect URI. Twitch
 wants `scopes` space-delimited and URL-encoded, answers `authorization_pending` (HTTP 400)
 while waiting, and its `verification_uri` already carries the code. The user must supply a
-`client_id` from dev.twitch.tv/console/apps (public client) — `modules/twitch` stores it via
+`client_id` from dev.twitch.tv/console/apps; registration wants a Name (unique across all
+Twitch apps), a Category and an OAuth Redirect URL, but **that redirect is never used by the
+device flow** (`http://localhost` does) and no client secret is needed — `modules/twitch` stores it via
 `set-client-id` and still accepts a hand-injected token through `set-auth` (the fallback the
 tests use). Covered offline by `oauth.rs::device_flow_polls_until_authorized` /
 `device_flow_stops_on_refusal`, using `http::test_server::spawn_sequence`.

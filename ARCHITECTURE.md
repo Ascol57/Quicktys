@@ -359,8 +359,10 @@ binaire distribué — et l'Implicit ne rend pas de refresh token. Device Code n
 demande qu'un `client_id` **public**, rend un refresh token, et n'exige ni
 serveur loopback ni URL de redirection déclarée ; l'utilisateur peut même valider
 depuis son téléphone. L'utilisateur fournit son propre `client_id`
-(dev.twitch.tv/console/apps, type de client *public*), stocké par le module via
-`set-client-id`.
+(dev.twitch.tv/console/apps), stocké par le module via `set-client-id`. Le
+formulaire d'enregistrement réclame une URL de redirection, mais **le flux
+appareil ne s'en sert jamais** — `http://localhost` suffit — et aucun client
+secret n'est requis.
 
 ⚠️ Reste à faire : le token-store est **en mémoire** — une reconnexion est
 nécessaire à chaque démarrage. Le persister (chiffré, via le trousseau de l'OS)
