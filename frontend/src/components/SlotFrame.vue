@@ -7,6 +7,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { ipc } from "../ipc.js";
+import { plain } from "../plain.js";
 
 const props = defineProps({
   plugin: { type: String, required: true },
@@ -26,7 +27,7 @@ const src = computed(() => (ipc.isNative ? uiUrl() : null));
 const frame = ref(null);
 function postContext() {
   frame.value?.contentWindow?.postMessage(
-    { source: "quicktys", type: "context", context: props.context ?? {} },
+    { source: "quicktys", type: "context", context: plain(props.context ?? {}) },
     "*",
   );
 }

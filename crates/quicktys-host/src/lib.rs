@@ -31,6 +31,7 @@ mod hid;
 mod http;
 mod input;
 pub mod oauth;
+
 mod process;
 mod ws;
 
@@ -452,25 +453,30 @@ impl mapi::net::Host for HostState {
         };
         let module_id = self.id.clone();
         let handle = HANDLE.fetch_add(1, Ordering::Relaxed);
-        // Reader thread: connect, then push each message to the module via
-        // `on-host-event`, draining the events it emits to subscribers.
+
+        // Connect **synchronously**, before returning the handle.
+        //
+        // This used to happen inside the reader thread, which meant `ws-connect`
+        // returned a handle that was not yet usable: a module that speaks first
+        // (Twitch IRC must send CAP/NICK/JOIN — the server stays silent until it
+        // does) raced the thread and its `net.send` calls were dropped on the
+        // floor. It also made the `result<_, net-error>` return type a lie: a
+        // refused connection was only ever a log line.
+        let mut conn = ws::connect(&url).map_err(|e| {
+            tracing::warn!(module = %module_id, "ws-connect {url}: {e}");
+            mapi::net::NetError::Other(e)
+        })?;
+        // Register the write half BEFORE anyone can use the handle, so a module
+        // may send the moment `ws-connect` returns.
+        let sender = conn
+            .sender()
+            .map_err(|e| mapi::net::NetError::Other(format!("ws sender: {e}")))?;
+        world.ws_senders.lock().unwrap().insert(handle, sender);
+        tracing::info!(module = %module_id, "ws-connect {url} open");
+
+        // Reader thread: push each message to the module via `on-host-event`,
+        // draining the events it emits to subscribers.
         std::thread::spawn(move || {
-            let mut conn = match ws::connect(&url) {
-                Ok(c) => c,
-                Err(e) => {
-                    tracing::warn!(module = %module_id, "ws-connect {url}: {e}");
-                    return;
-                }
-            };
-            // Register the write half so the module can `net.send` on this handle
-            // (e.g. the obs-websocket Identify sent in reply to Hello).
-            match conn.sender() {
-                Ok(sender) => {
-                    world.ws_senders.lock().unwrap().insert(handle, sender);
-                }
-                Err(e) => tracing::warn!(module = %module_id, "ws sender: {e}"),
-            }
-            tracing::info!(module = %module_id, "ws-connect {url} open");
             loop {
                 let text = match conn.read_message() {
                     Ok(t) => t,
@@ -507,7 +513,15 @@ impl mapi::net::Host for HostState {
     }
     fn close(&mut self, handle: u64) {
         if let Some(world) = self.world.upgrade() {
-            world.ws_senders.lock().unwrap().remove(&handle);
+            // Forgetting the write half is not closing: the reader thread is
+            // parked in a blocking read and would go on delivering events from a
+            // socket the module thinks it dropped — two joined Twitch chat
+            // sockets meant every message arrived twice. Shut it down so the
+            // read returns and the loop ends.
+            let sender = world.ws_senders.lock().unwrap().remove(&handle);
+            if let Some(sender) = sender {
+                sender.shutdown();
+            }
         }
     }
 }

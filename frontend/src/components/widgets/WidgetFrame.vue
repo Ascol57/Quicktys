@@ -7,6 +7,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { ipc } from "../../ipc.js";
+import { plain } from "../../plain.js";
 
 const props = defineProps({
   widgetId: { type: String, default: "" },
@@ -47,11 +48,14 @@ let state = {};
 let unlisten = null;
 
 function postState() {
-  frame.value?.contentWindow?.postMessage({ source: "quicktys", type: "state", state }, "*");
+  frame.value?.contentWindow?.postMessage(
+    { source: "quicktys", type: "state", state: plain(state) },
+    "*",
+  );
 }
 function postConfig() {
   frame.value?.contentWindow?.postMessage(
-    { source: "quicktys", type: "config", config: props.config ?? {} },
+    { source: "quicktys", type: "config", config: plain(props.config ?? {}) },
     "*",
   );
 }

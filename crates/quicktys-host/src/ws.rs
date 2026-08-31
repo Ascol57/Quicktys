@@ -79,6 +79,16 @@ impl Transport {
         }
     }
 
+    /// Close the underlying socket in both directions, so a reader parked in a
+    /// blocking read wakes up and its loop ends.
+    fn shutdown(&self) {
+        let sock = match self {
+            Transport::Plain(s) => s,
+            Transport::Tls { sock, .. } => sock,
+        };
+        let _ = sock.shutdown(std::net::Shutdown::Both);
+    }
+
     /// A second handle onto the same connection, for the write half.
     fn split(&self) -> Result<Transport, String> {
         Ok(match self {
@@ -286,6 +296,13 @@ pub struct WsSender {
 impl WsSender {
     pub fn send_text(&mut self, text: &str) -> Result<(), String> {
         send_frame(&mut self.stream, 0x1, text.as_bytes())
+    }
+
+    /// Really close the connection. Dropping the write half is NOT enough: the
+    /// reader thread owns its own handle on the same socket and would keep
+    /// delivering events from a connection the module believes it closed.
+    pub fn shutdown(&self) {
+        self.stream.shutdown();
     }
 }
 

@@ -14,6 +14,7 @@ import { computed, inject, onMounted, onUnmounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "primevue/usetoast";
 import { ipc } from "../ipc.js";
+import { plain } from "../plain.js";
 
 const { t, te } = useI18n();
 
@@ -37,7 +38,8 @@ const src = computed(() => (ipc.isNative ? uiUrl() : null));
 
 const frame = ref(null);
 function post(msg) {
-  frame.value?.contentWindow?.postMessage(msg, "*");
+  // Never hand a reactive proxy to postMessage — see plain.js.
+  frame.value?.contentWindow?.postMessage(plain(msg), "*");
 }
 
 const tr = (key, fallback) => (te(key) ? t(key) : fallback);

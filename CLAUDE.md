@@ -100,7 +100,13 @@ so widgets can grow taller too); "Add widget" is a searchable palette (Popover) 
 action/trigger pickers. The runtime bridge (postMessage): host →
 widget `{source:"quicktys",type:"state",state}`; widget → host `{source:"quicktys-widget",
 type:"ready"|"action",plugin,action,config}` (an action runs as a one-node sequence via
-`run_sequence`). Reference widgets: `widgets/pear-now-playing` (cover + title + play/pause
+`run_sequence`). **Never hand a Vue value straight to `postMessage`**: it serialises with the
+structured clone algorithm, which throws `DataCloneError` on a **Proxy** — and `props.config`,
+`props.context` and anything out of a store *are* reactive proxies. WebKit (Tauri's webview on
+Linux and macOS) rejects them outright, so the widget silently never got its settings. `toRaw()`
+is not enough (top level only); every bridge payload goes through `plain()`
+(`frontend/src/plain.js`, a JSON round-trip — the bridges are JSON by contract). Applies to
+`WidgetFrame`, `SlotFrame` and `ViewFrame`. Reference widgets: `widgets/pear-now-playing` (cover + title + play/pause
 toggle driven by `pear.playing`, from `/song`'s `isPaused`, + next/previous) and
 `widgets/pear-queue` (the play queue, current track highlighted). The `pear` module's `poll`
 emits `song` on a title **or** pause change (so `pear.playing` tracks the player),
@@ -247,7 +253,19 @@ bundled webpki-roots, `ring` provider; e.g. Discord webhooks / Twitch). It frame
 an async handler (e.g. Pear's `/api/v1/queue`, which round-trips over IPC) abandons the response
 if the client sends FIN first, and keep-alive servers never close, so reading-until-EOF hung/
 returned empty (that's why the queue widget was blank; regression tests in `http.rs`). `net.send`
-(WS write) is real too (`ws.rs::WsSender`, used by the obs Identify/requests). **`audio.play-file`
+(WS write) is real too (`ws.rs::WsSender`, used by the obs Identify/requests). **`ws-connect`
+connects synchronously** before returning the handle, and registers the write half first: it
+used to hand back a handle while a thread was still dialling, so a module that *speaks first*
+(Twitch IRC — the server stays silent until CAP/NICK/JOIN arrive) raced it and its `net.send`
+calls were dropped, giving an open socket that never produced a message. It also made the
+`result<_, net-error>` return type a lie (a refused connection was only a log line). Drivers
+that answer a server greeting (obs) never noticed. `tests/twitch_chat.rs` pins it: the stand-in
+server decodes the client's masked frames and asserts the login actually arrived.
+**`net.close` really closes**: it used to drop only the write half, leaving the reader thread
+parked on a live socket and still delivering — so re-joining a chat (a dashboard box *and* an
+overlay both call `connect-chat`) doubled every message. It now `shutdown(Both)`s the socket so
+the blocking read returns and the loop ends. `tests/ws_close.rs` pins it (and fails with the
+duplicated message if the shutdown is removed). **`audio.play-file`
 is real** — decodes wav/mp3/ogg/flac and plays host-side via `rodio` on a dedicated thread that
 owns the (!Send) output stream (`src/audio.rs`; graceful no-op when there's no device). The
 **`storage` cap persists** to `<data>/storage/<id>.json` per extension (`WasmHost::set_storage_dir`).

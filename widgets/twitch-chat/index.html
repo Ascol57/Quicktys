@@ -103,6 +103,7 @@
       let state = {};
       let config = {};
       let joined = "";        // channel we last asked the plugin to watch
+      let failure = "";       // why the join failed, if it did
       let rendered = "";      // last rendered signature, to avoid churn
 
       const $ = (id) => document.getElementById(id);
@@ -253,9 +254,14 @@
         scheduleFade();
       }
 
+      /// What to show while there are no messages. A configuration mistake (no
+      /// channel) or a failed join must be visible — an overlay that is simply
+      /// blank is indistinguishable from a quiet chat.
       function emptyText() {
+        if (failure) return failure;
         const channel = String(config.channel || "").trim();
-        return channel ? `#${channel}` : "…";
+        if (!channel) return "⚠ no channel set in the widget settings";
+        return `#${channel} — waiting for messages`;
       }
 
       // Overlay classic: let messages disappear after a while so the overlay
@@ -277,6 +283,11 @@
           config = d.config || {};
           applyConfig();
           rendered = ""; // settings changed → force a repaint
+        } else if (d.type === "error") {
+          // The host could not run our `watch-chat` (plugin missing, bad
+          // channel…). Say so rather than sit empty.
+          failure = "⚠ " + String(d.error ?? "could not join the chat");
+          rendered = "";
         } else if (d.type === "state") {
           state = d.state || {};
         }

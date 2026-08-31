@@ -26,7 +26,7 @@ wit_bindgen::generate!({
 
 use quicktys::api::events::emit_event;
 use quicktys::api::logging::{log, Level};
-use quicktys::api::net::{fetch, send, ws_connect, HttpRequest};
+use quicktys::api::net::{close, fetch, send, ws_connect, HttpRequest};
 use quicktys::api::oauth::access_token;
 use quicktys::api::storage::{kv_get, kv_set};
 
@@ -79,11 +79,17 @@ thread_local! {
     static CHAT_HANDLE: std::cell::RefCell<Option<u64>> = const { std::cell::RefCell::new(None) };
 }
 
+/// Send one IRC line. Failures are logged rather than swallowed: if CAP/NICK/
+/// JOIN do not reach the server the chat is silently dead, which is exactly the
+/// bug that hid a racy `ws-connect`.
 fn chat_send(line: &str) {
-    CHAT_HANDLE.with(|h| {
-        if let Some(handle) = *h.borrow() {
-            let _ = send(handle, format!("{line}\r\n").as_bytes());
+    CHAT_HANDLE.with(|h| match *h.borrow() {
+        Some(handle) => {
+            if let Err(e) = send(handle, format!("{line}\r\n").as_bytes()) {
+                log(Level::Warn, &format!("twitch chat: send failed: {e:?}"));
+            }
         }
+        None => log(Level::Warn, "twitch chat: no socket to send on"),
     });
 }
 
@@ -566,6 +572,14 @@ impl Module for Twitch {
                     .ok_or("connect-chat: `channel` is required")?;
                 kv_set("chat_channel", &channel);
 
+                // One socket, always. Several widgets can ask to watch the same
+                // channel (a dashboard box *and* an overlay); without closing the
+                // previous connection every message would be delivered twice.
+                CHAT_HANDLE.with(|h| {
+                    if let Some(old) = h.borrow_mut().take() {
+                        close(old);
+                    }
+                });
                 let handle = ws_connect(&chat_url(), CHAT_EVENT)
                     .map_err(|e| format!("twitch chat: connect failed: {e:?}"))?;
                 CHAT_HANDLE.with(|h| *h.borrow_mut() = Some(handle));

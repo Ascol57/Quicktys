@@ -93,8 +93,15 @@ async fn handle(server: Arc<OverlayServer>, mut stream: TcpStream) {
                     Err(_) => break,
                 }
             }
-            run_action(&server, &body).await;
-            respond(stream, "204 No Content", "text/plain", Vec::new()).await
+            // Answer with the outcome so a self-driving widget can show why it
+            // is empty instead of just sitting there.
+            match run_action(&server, &body).await {
+                Ok(()) => respond(stream, "200 OK", "application/json", b"{\"ok\":true}".to_vec()).await,
+                Err(message) => {
+                    let body = json!({ "ok": false, "error": message }).to_string();
+                    respond(stream, "200 OK", "application/json", body.into_bytes()).await
+                }
+            }
         }
         ("GET", p) if p.starts_with("/overlay/") => {
             let id = p.trim_start_matches("/overlay/").trim_end_matches('/');
@@ -146,11 +153,17 @@ async fn sse(server: Arc<OverlayServer>, mut stream: TcpStream) {
 }
 
 /// Run a widget-posted action (`{plugin, action, config}`) as a one-node sequence.
-async fn run_action(server: &OverlayServer, body: &[u8]) {
-    let Ok(v) = serde_json::from_slice::<Value>(body) else { return };
-    let (Some(plugin), Some(action)) = (v.get("plugin").and_then(Value::as_str), v.get("action").and_then(Value::as_str))
-    else {
-        return;
+/// Run a widget-requested action. Returns the outcome so the overlay page can
+/// surface it: a widget that drives itself (the Twitch chat asks the plugin to
+/// join a channel) is dead in the water if the action fails, and swallowing the
+/// error made that indistinguishable from "no messages yet".
+async fn run_action(server: &OverlayServer, body: &[u8]) -> Result<(), String> {
+    let v: Value = serde_json::from_slice(body).map_err(|e| format!("bad request: {e}"))?;
+    let (Some(plugin), Some(action)) = (
+        v.get("plugin").and_then(Value::as_str),
+        v.get("action").and_then(Value::as_str),
+    ) else {
+        return Err("plugin and action are required".to_string());
     };
     let root = json!({
         "kind": "action",
@@ -158,7 +171,15 @@ async fn run_action(server: &OverlayServer, body: &[u8]) {
         "action": action,
         "config": v.get("config").cloned().unwrap_or_else(|| json!({})),
     });
-    let _ = server.backend.run_sequence(root).await;
+    server
+        .backend
+        .run_sequence(root)
+        .await
+        .map(|_| ())
+        .map_err(|message| {
+            tracing::warn!(%plugin, %action, "overlay action failed: {message}");
+            message
+        })
 }
 
 async fn respond(mut stream: TcpStream, status: &str, ct: &str, body: Vec<u8>) {
@@ -242,7 +263,15 @@ window.addEventListener('message', (e) => {{
   if (d.type === 'ready' && fr) {{ pushConfig(fr); pushState(fr); }}
   else if (d.type === 'action' && d.plugin && d.action) {{
     fetch('/action', {{ method: 'POST', headers: {{ 'Content-Type': 'application/json' }},
-      body: JSON.stringify({{ plugin: d.plugin, action: d.action, config: d.config || {{}} }}) }});
+      body: JSON.stringify({{ plugin: d.plugin, action: d.action, config: d.config || {{}} }}) }})
+      .then((r) => r.json())
+      .then((res) => {{
+        if (res && res.ok === false) {{
+          console.error('[quicktys] action ' + d.plugin + '.' + d.action + ' failed:', res.error);
+          if (fr) post(fr.f, {{ source: 'quicktys', type: 'error', error: res.error }});
+        }}
+      }})
+      .catch(() => {{}});
   }}
 }});
 const es = new EventSource('/events');

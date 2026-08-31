@@ -16,7 +16,7 @@ use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::Command;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 /// One masked-free server→client text frame (servers must not mask).
@@ -33,11 +33,38 @@ fn text_frame(payload: &str) -> Vec<u8> {
     frame
 }
 
-/// A stand-in Twitch IRC server: completes the WebSocket handshake, then pushes
-/// the lines it was given.
-fn spawn_irc(lines: Vec<String>) -> String {
+/// Decode one client→server frame. Client frames are always masked (RFC 6455).
+fn read_client_frame(stream: &mut std::net::TcpStream) -> Option<String> {
+    let mut head = [0u8; 2];
+    stream.read_exact(&mut head).ok()?;
+    let masked = head[1] & 0x80 != 0;
+    let mut len = (head[1] & 0x7f) as usize;
+    if len == 126 {
+        let mut ext = [0u8; 2];
+        stream.read_exact(&mut ext).ok()?;
+        len = u16::from_be_bytes(ext) as usize;
+    }
+    let mut mask = [0u8; 4];
+    if masked {
+        stream.read_exact(&mut mask).ok()?;
+    }
+    let mut payload = vec![0u8; len];
+    stream.read_exact(&mut payload).ok()?;
+    if masked {
+        for (i, b) in payload.iter_mut().enumerate() {
+            *b ^= mask[i % 4];
+        }
+    }
+    Some(String::from_utf8_lossy(&payload).to_string())
+}
+
+/// A stand-in Twitch IRC server: completes the WebSocket handshake, records what
+/// the client says, then pushes the lines it was given.
+fn spawn_irc(lines: Vec<String>) -> (String, Arc<Mutex<Vec<String>>>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
     let addr = listener.local_addr().unwrap();
+    let said = Arc::new(Mutex::new(Vec::new()));
+    let heard = said.clone();
     std::thread::spawn(move || {
         let Ok((mut s, _)) = listener.accept() else { return };
         let mut req = Vec::new();
@@ -54,6 +81,15 @@ fn spawn_irc(lines: Vec<String>) -> String {
         let _ = s.write_all(
             b"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n",
         );
+        // What the client sends the moment it connects — the IRC login. Twitch
+        // stays silent until it arrives, so a lost CAP/NICK/JOIN means a chat
+        // that never produces anything.
+        let mut reader = s.try_clone().expect("clone");
+        std::thread::spawn(move || {
+            while let Some(line) = read_client_frame(&mut reader) {
+                heard.lock().unwrap().push(line);
+            }
+        });
         for line in lines {
             let _ = s.write_all(&text_frame(&line));
             std::thread::sleep(Duration::from_millis(20));
@@ -61,7 +97,7 @@ fn spawn_irc(lines: Vec<String>) -> String {
         // Hold the socket open so the reader thread doesn't see a close.
         std::thread::sleep(Duration::from_millis(800));
     });
-    format!("ws://{addr}/")
+    (format!("ws://{addr}/"), said)
 }
 
 fn build(dir_rel: &str, name: &str) -> PathBuf {
@@ -95,7 +131,7 @@ fn eventually<T>(mut f: impl FnMut() -> Option<T>) -> T {
 fn irc_messages_reach_the_reactive_buffer_and_the_trigger() {
     // A realistic tagged PRIVMSG, plus a PING (which must not become a message)
     // and a JOIN acknowledgement (ditto).
-    let url = spawn_irc(vec![
+    let (url, said) = spawn_irc(vec![
         ":tmi.twitch.tv 001 justinfan1 :Welcome, GLHF!\r\n".to_string(),
         "PING :tmi.twitch.tv\r\n".to_string(),
         concat!(
@@ -150,6 +186,14 @@ fn irc_messages_reach_the_reactive_buffer_and_the_trigger() {
     assert_eq!(messages[1]["text"], json!("salut !"));
     // An empty `color` is left empty — the widget picks a stable hue itself.
     assert_eq!(messages[1]["color"], json!(""));
+
+    // The IRC login must actually have reached the server. `ws-connect` used to
+    // return a handle before the socket existed, so these were dropped and the
+    // chat stayed silent for ever.
+    let login = said.lock().unwrap().join("");
+    assert!(login.contains("CAP REQ :twitch.tv/tags"), "no CAP REQ sent: {login:?}");
+    assert!(login.contains("NICK justinfan"), "no NICK sent: {login:?}");
+    assert!(login.contains("JOIN #ascol57"), "no JOIN sent: {login:?}");
 
     // …and each message fired the trigger a profile can bind to.
     let event = fired.try_recv().expect("a chat-message trigger");
