@@ -4,8 +4,14 @@
      (postMessage). Composes browser-source overlays: runtime widgets freely
      positioned/sized in PERCENTAGES on a fixed-aspect canvas, rendered identically
      at any OBS output resolution. Copy the /overlay/<id> URL into an OBS Browser
-     source. (Editor shows labeled boxes, not live widget previews; OBS renders
-     the real widgets.) -->
+     source.
+
+     WYSIWYG: each placed widget is rendered for real in a sandboxed, inert
+     iframe (`pointer-events: none`, so the editor keeps every click), fed the
+     same config the overlay will use. Drag from anywhere on a widget, resize
+     from eight handles, nudge with the arrows; edges snap to the canvas sides
+     and centre and to the other widgets, with a guide shown for whatever
+     matched (Alt places freely). -->
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Overlays</title>
@@ -23,6 +29,7 @@
   .btn.primary { background: #3a5; border-color: #3a5; color: #06210f; font-weight: 600; }
   .btn.danger { color: #e5827a; }
   .spacer { flex: 1; }
+  .tip { flex-basis: 100%; opacity: .45; font-size: .75rem; }
   .seg { display: inline-flex; border: 1px solid #333; border-radius: 6px; overflow: hidden; }
   .seg button { background: #1c1c1c; border: 0; padding: .35rem .6rem; cursor: pointer; }
   .seg button.on { background: #3a5; color: #06210f; font-weight: 600; }
@@ -34,11 +41,52 @@
   .canvas.landscape { aspect-ratio: 16/9; width: min(100cqw, calc(100cqh * 16 / 9)); }
   .canvas.portrait { aspect-ratio: 9/16; height: min(100cqh, calc(100cqw * 9 / 16)); }
   .hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #555; font-size: .85rem; pointer-events: none; text-align: center; padding: 1rem; }
-  .node { position: absolute; border: 1px dashed rgba(126,194,126,.55); background: rgba(126,194,126,.07); display: flex; align-items: center; justify-content: center; }
-  .node .lbl { font-size: .8rem; color: #bfe0bf; pointer-events: none; padding: .2rem; text-align: center; overflow: hidden; }
-  .node .move { position: absolute; top: -1.5rem; left: 0; background: #1c1c1c; border: 1px solid #333; border-radius: 5px; padding: .05rem .35rem; font-size: .72rem; display: flex; gap: .3rem; align-items: center; white-space: nowrap; cursor: move; }
-  .node .move .rm { cursor: pointer; color: #e5827a; }
-  .node .rz { position: absolute; right: -4px; bottom: -4px; width: 14px; height: 14px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 45%, #7ec27e 45%); }
+  /* A node is dragged from ANYWHERE on it. The old design put the drag bar
+     above the box (top: -1.5rem), which the canvas' `overflow: hidden` clipped
+     as soon as a widget touched the top edge — making it impossible to move. */
+  .node { position: absolute; border: 1px dashed rgba(126,194,126,.45); background: rgba(126,194,126,.05); cursor: move; }
+  .node:hover { border-color: rgba(126,194,126,.8); }
+  .node.sel { border: 1px solid #7ec27e; background: rgba(126,194,126,.09); box-shadow: 0 0 0 1px rgba(126,194,126,.35), 0 6px 22px rgba(0,0,0,.45); }
+  /* The real widget, rendered but inert: clicks belong to the editor. */
+  .node .frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; background: transparent; }
+  .node .lbl {
+    position: absolute; left: 0; bottom: 0; max-width: 100%;
+    font-size: .68rem; color: #cfe8cf; background: rgba(0,0,0,.55);
+    padding: .05rem .3rem; border-radius: 0 5px 0 0;
+    pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  /* Buttons live INSIDE the node, so they are never clipped by the canvas. */
+  .node .bar {
+    position: absolute; top: 2px; right: 2px; display: flex; gap: 1px;
+    background: rgba(20,20,20,.85); border: 1px solid #333; border-radius: 5px;
+    padding: .05rem .15rem; font-size: .72rem; opacity: 0; transition: opacity .12s;
+  }
+  .node:hover .bar, .node.sel .bar { opacity: 1; }
+  .node .bar span { cursor: pointer; padding: 0 .18rem; line-height: 1.2; }
+  .node .bar .rm { color: #e5827a; }
+  .node .bar .cg { color: #9fc9e8; }
+  .node .bar .z { color: #bbb; }
+  /* Eight handles, shown on the selected node only. */
+  .node .h { position: absolute; width: 9px; height: 9px; background: #7ec27e; border: 1px solid #10240f; border-radius: 2px; display: none; }
+  .node.sel .h { display: block; }
+  .h.nw { left: -5px; top: -5px; cursor: nwse-resize; }
+  .h.n  { left: calc(50% - 4px); top: -5px; cursor: ns-resize; }
+  .h.ne { right: -5px; top: -5px; cursor: nesw-resize; }
+  .h.e  { right: -5px; top: calc(50% - 4px); cursor: ew-resize; }
+  .h.se { right: -5px; bottom: -5px; cursor: nwse-resize; }
+  .h.s  { left: calc(50% - 4px); bottom: -5px; cursor: ns-resize; }
+  .h.sw { left: -5px; bottom: -5px; cursor: nesw-resize; }
+  .h.w  { left: -5px; top: calc(50% - 4px); cursor: ew-resize; }
+  /* Alignment guides + the live x/y/w/h readout while manipulating. */
+  .guide { position: absolute; background: #ff4a80; pointer-events: none; z-index: 9; }
+  .guide.v { width: 1px; top: 0; bottom: 0; }
+  .guide.h { height: 1px; left: 0; right: 0; }
+  .readout {
+    position: absolute; z-index: 10; pointer-events: none;
+    background: rgba(20,20,20,.9); border: 1px solid #333; border-radius: 5px;
+    padding: .1rem .35rem; font-size: .7rem; color: #ddd;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
   .empty { display: flex; flex-direction: column; align-items: center; gap: .6rem; opacity: .65; }
   .empty .big { font-size: 2.4rem; }
   .pal { position: fixed; background: #1c1c1c; border: 1px solid #333; border-radius: 8px; padding: .3rem; min-width: 12rem; box-shadow: 0 10px 30px rgba(0,0,0,.5); z-index: 20; }
@@ -60,7 +108,6 @@
   .cfg input[type=range] { flex: 1; }
   .cfg .val { font-variant-numeric: tabular-nums; opacity: .8; font-size: .78rem; min-width: 2.6rem; text-align: right; }
   .cfg .none { opacity: .5; font-size: .85rem; padding: .2rem 0 .4rem; }
-  .node .move .cg { cursor: pointer; color: #9fc9e8; }
 </style>
 
 <header>
@@ -81,6 +128,7 @@
     </span>
     <button class="btn danger" id="delBtn" title="Delete overlay">🗑</button>
   </div>
+  <small class="tip" id="t-hint2"></small>
 </header>
 
 <main>
@@ -108,10 +156,14 @@
   const STR = {
     en: { title: "Overlays", new: "New", add: "Add widget", none: "No overlays yet.", new2: "New overlay",
           untitled: "New overlay", hint: "Add a widget, then drag to place and resize it.", nomatch: "No widgets", del: "Delete this overlay?",
-          settings: "Settings", nosettings: "This widget has no settings." },
+          settings: "Settings", nosettings: "This widget has no settings.",
+          remove: "Remove", bringFront: "Bring forward", sendBack: "Send backward",
+          hint2: "Drag to place · handles to resize · arrows to nudge · Alt to ignore guides" },
     fr: { title: "Overlays", new: "Nouveau", add: "Ajouter un widget", none: "Aucun overlay.", new2: "Nouvel overlay",
           untitled: "Nouvel overlay", hint: "Ajoutez un widget, puis glissez pour le placer et le redimensionner.", nomatch: "Aucun widget", del: "Supprimer cet overlay ?",
-          settings: "Réglages", nosettings: "Ce widget n'a pas de réglages." },
+          settings: "Réglages", nosettings: "Ce widget n'a pas de réglages.",
+          remove: "Retirer", bringFront: "Passer devant", sendBack: "Passer derrière",
+          hint2: "Glissez pour placer · poignées pour redimensionner · flèches pour ajuster · Alt pour ignorer les repères" },
   };
   let S = STR.en;
 
@@ -182,34 +234,236 @@
     save(); render();
   }
 
-  // ---- drag / resize (percentages of the canvas) --------------------------
+  // ---- selection, drag, resize, snapping ---------------------------------
+  //
+  // Everything is in PERCENTAGES of the canvas, so an overlay renders the same
+  // at any OBS output resolution. A node is dragged from anywhere on itself;
+  // the eight handles resize it. Edges snap to the canvas (sides + centre) and
+  // to the other widgets' edges and centres, with a guide drawn for whatever
+  // matched — hold Alt to place freely.
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-  let drag = null, resize = null;
-  function startMove(e, w, rect) { drag = { w, x: e.clientX, y: e.clientY, sx: w.x, sy: w.y, rect }; bindDrag(); }
-  function startResize(e, w, rect) { resize = { w, x: e.clientX, y: e.clientY, sw: w.w, sh: w.h, rect }; bindDrag(); }
-  function bindDrag() { window.addEventListener("mousemove", onDrag); window.addEventListener("mouseup", endDrag); }
-  function onDrag(e) {
-    if (drag) {
-      const dx = ((e.clientX - drag.x) / drag.rect.width) * 100, dy = ((e.clientY - drag.y) / drag.rect.height) * 100;
-      drag.w.x = clamp(Math.round(drag.sx + dx), 0, 100 - drag.w.w);
-      drag.w.y = clamp(Math.round(drag.sy + dy), 0, 100 - drag.w.h);
-      positionNode(drag.w);
-    } else if (resize) {
-      const dw = ((e.clientX - resize.x) / resize.rect.width) * 100, dh = ((e.clientY - resize.y) / resize.rect.height) * 100;
-      resize.w.w = clamp(Math.round(resize.sw + dw), 5, 100 - resize.w.x);
-      resize.w.h = clamp(Math.round(resize.sh + dh), 5, 100 - resize.w.y);
-      positionNode(resize.w);
+  const SNAP = 1.2;   // % — about 20px on a 1080p-wide canvas
+  const MIN = 4;      // % — a widget smaller than this is unusable
+
+  let selectedId = null;
+  let drag = null;
+  let resize = null;
+
+  function select(id) {
+    if (selectedId === id) return;
+    selectedId = id;
+    for (const el of document.querySelectorAll(".node")) {
+      el.classList.toggle("sel", el.id === "node-" + id);
     }
   }
+
+  /// Positions worth snapping to on each axis: the canvas sides and centre,
+  /// plus every OTHER widget's sides and centre.
+  function snapTargets(exceptId) {
+    const xs = [0, 50, 100];
+    const ys = [0, 50, 100];
+    for (const other of current()?.widgets ?? []) {
+      if (other.id === exceptId) continue;
+      xs.push(other.x, other.x + other.w, other.x + other.w / 2);
+      ys.push(other.y, other.y + other.h, other.y + other.h / 2);
+    }
+    return { xs, ys };
+  }
+
+  /// Best correction that brings one of `edges` onto a target, or none.
+  function snapAxis(edges, targets, disabled) {
+    if (disabled) return { delta: 0, guide: null };
+    let best = null;
+    for (const edge of edges) {
+      for (const target of targets) {
+        const delta = target - edge;
+        if (Math.abs(delta) <= SNAP && (!best || Math.abs(delta) < Math.abs(best.delta))) {
+          best = { delta, guide: target };
+        }
+      }
+    }
+    return best ?? { delta: 0, guide: null };
+  }
+
+  function showGuides(canvas, x, y) {
+    for (const el of canvas.querySelectorAll(".guide")) el.remove();
+    const add = (cls, style) => {
+      const g = document.createElement("div");
+      g.className = "guide " + cls;
+      g.style.cssText = style;
+      canvas.appendChild(g);
+    };
+    if (x !== null) add("v", `left:${x}%`);
+    if (y !== null) add("h", `top:${y}%`);
+  }
+  function clearGuides() {
+    for (const el of document.querySelectorAll(".guide, .readout")) el.remove();
+  }
+
+  function showReadout(canvas, w) {
+    let el = canvas.querySelector(".readout");
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "readout";
+      canvas.appendChild(el);
+    }
+    el.textContent = `${Math.round(w.x)},${Math.round(w.y)} · ${Math.round(w.w)}×${Math.round(w.h)}`;
+    el.style.left = clamp(w.x, 0, 80) + "%";
+    // Above the node, or below it when there is no room at the top.
+    el.style.top = (w.y > 8 ? w.y - 6 : w.y + w.h + 1) + "%";
+  }
+
+  function startMove(e, w, rect) {
+    select(w.id);
+    drag = { w, x: e.clientX, y: e.clientY, sx: w.x, sy: w.y, rect };
+    bindDrag();
+  }
+  function startResize(e, w, rect, dir) {
+    select(w.id);
+    resize = { w, dir, x: e.clientX, y: e.clientY, sx: w.x, sy: w.y, sw: w.w, sh: w.h, rect };
+    bindDrag();
+  }
+  function bindDrag() {
+    window.addEventListener("mousemove", onDrag);
+    window.addEventListener("mouseup", endDrag);
+  }
+
+  function onDrag(e) {
+    const canvas = document.querySelector(".canvas");
+    if (!canvas) return;
+    const free = e.altKey; // Alt disables snapping
+
+    if (drag) {
+      const { w, rect } = drag;
+      const dx = ((e.clientX - drag.x) / rect.width) * 100;
+      const dy = ((e.clientY - drag.y) / rect.height) * 100;
+      let x = clamp(drag.sx + dx, 0, 100 - w.w);
+      let y = clamp(drag.sy + dy, 0, 100 - w.h);
+
+      const { xs, ys } = snapTargets(w.id);
+      const sx = snapAxis([x, x + w.w, x + w.w / 2], xs, free);
+      const sy = snapAxis([y, y + w.h, y + w.h / 2], ys, free);
+      x = clamp(x + sx.delta, 0, 100 - w.w);
+      y = clamp(y + sy.delta, 0, 100 - w.h);
+
+      w.x = x;
+      w.y = y;
+      positionNode(w);
+      showGuides(canvas, sx.guide, sy.guide);
+      showReadout(canvas, w);
+      return;
+    }
+
+    if (!resize) return;
+    const { w, rect, dir } = resize;
+    const dx = ((e.clientX - resize.x) / rect.width) * 100;
+    const dy = ((e.clientY - resize.y) / rect.height) * 100;
+    const right = resize.sx + resize.sw;
+    const bottom = resize.sy + resize.sh;
+
+    // Each direction moves only the edges it names; the opposite edge is fixed.
+    if (dir.includes("e")) w.w = clamp(resize.sw + dx, MIN, 100 - w.x);
+    if (dir.includes("s")) w.h = clamp(resize.sh + dy, MIN, 100 - w.y);
+    if (dir.includes("w")) {
+      w.x = clamp(resize.sx + dx, 0, right - MIN);
+      w.w = right - w.x;
+    }
+    if (dir.includes("n")) {
+      w.y = clamp(resize.sy + dy, 0, bottom - MIN);
+      w.h = bottom - w.y;
+    }
+
+    const { xs, ys } = snapTargets(w.id);
+    const sx = snapAxis([dir.includes("w") ? w.x : w.x + w.w], xs, free);
+    const sy = snapAxis([dir.includes("n") ? w.y : w.y + w.h], ys, free);
+    if (sx.delta) {
+      if (dir.includes("w")) { const r = w.x + w.w; w.x = clamp(w.x + sx.delta, 0, r - MIN); w.w = r - w.x; }
+      else if (dir.includes("e")) w.w = clamp(w.w + sx.delta, MIN, 100 - w.x);
+    }
+    if (sy.delta) {
+      if (dir.includes("n")) { const b = w.y + w.h; w.y = clamp(w.y + sy.delta, 0, b - MIN); w.h = b - w.y; }
+      else if (dir.includes("s")) w.h = clamp(w.h + sy.delta, MIN, 100 - w.y);
+    }
+
+    positionNode(w);
+    showGuides(canvas, sx.guide, sy.guide);
+    showReadout(canvas, w);
+  }
+
   function endDrag() {
-    window.removeEventListener("mousemove", onDrag); window.removeEventListener("mouseup", endDrag);
-    if (drag || resize) save();
+    window.removeEventListener("mousemove", onDrag);
+    window.removeEventListener("mouseup", endDrag);
+    if (drag || resize) {
+      // Percentages are stored rounded: the OBS page reads the same numbers the
+      // readout showed, and a re-render can't drift by a fraction of a percent.
+      const w = (drag || resize).w;
+      w.x = Math.round(w.x); w.y = Math.round(w.y);
+      w.w = Math.round(w.w); w.h = Math.round(w.h);
+      positionNode(w);
+      save();
+    }
+    clearGuides();
     drag = resize = null;
   }
+
   function positionNode(w) {
     const el = document.getElementById("node-" + w.id);
-    if (el) { el.style.left = w.x + "%"; el.style.top = w.y + "%"; el.style.width = w.w + "%"; el.style.height = w.h + "%"; }
+    if (el) {
+      el.style.left = w.x + "%";
+      el.style.top = w.y + "%";
+      el.style.width = w.w + "%";
+      el.style.height = w.h + "%";
+    }
   }
+
+  // ---- z-order --------------------------------------------------------------
+  // Paint order IS array order, so raising a widget is moving it later.
+  function reorder(id, direction) {
+    const o = current();
+    if (!o) return;
+    const i = o.widgets.findIndex((w) => w.id === id);
+    const j = i + direction;
+    if (i < 0 || j < 0 || j >= o.widgets.length) return;
+    const list = [...o.widgets];
+    [list[i], list[j]] = [list[j], list[i]];
+    o.widgets = list;
+    save();
+    renderStage();
+    select(id);
+  }
+
+  // ---- keyboard -------------------------------------------------------------
+  // Arrows nudge the selection (Shift = 10%), Delete removes it, Escape drops
+  // the selection. Ignored while typing in a field or the settings panel.
+  document.addEventListener("keydown", (e) => {
+    if (!selectedId) return;
+    const tag = (e.target.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "select" || tag === "textarea") return;
+    const o = current();
+    const w = o?.widgets.find((x) => x.id === selectedId);
+    if (!w) return;
+
+    if (e.key === "Escape") {
+      select(null);
+      closeConfig();
+      return;
+    }
+    if (e.key === "Delete" || e.key === "Backspace") {
+      e.preventDefault();
+      removeWidget(selectedId);
+      selectedId = null;
+      return;
+    }
+    const step = e.shiftKey ? 10 : 1;
+    const moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+    const move = moves[e.key];
+    if (!move) return;
+    e.preventDefault();
+    w.x = clamp(w.x + move[0], 0, 100 - w.w);
+    w.y = clamp(w.y + move[1], 0, 100 - w.h);
+    positionNode(w);
+    save();
+  });
 
   // ---- add-widget palette -------------------------------------------------
   function openPalette(anchor) {
@@ -355,6 +609,45 @@
     document.removeEventListener("keydown", onCfgKey);
   }
 
+  // ---- live widget previews -------------------------------------------------
+  // Native serves each widget from its own `widget://` document (own origin, no
+  // inherited CSP → its inline scripts run); the app CSP already allows
+  // `frame-src widget:`. The browser mock has no such scheme, so it falls back
+  // to the HTML the host embedded in the manifest.
+  const NATIVE = location.protocol === "moduleui:" || location.hostname.endsWith(".localhost");
+
+  function widgetUrl(id, file) {
+    const windowsStyle = location.protocol === "http:" && location.hostname.endsWith(".localhost");
+    const base = windowsStyle ? `http://widget.localhost/${id}/` : `widget://localhost/${id}/`;
+    return base + (file || "");
+  }
+
+  /// The widget rendered as it will look on the overlay. Prefers its editor
+  /// `preview` page (a self-demo, so an idle widget isn't just blank) and falls
+  /// back to the real entry. Returns null for a widget that ships no HTML.
+  function widgetFrame(bundle, placed) {
+    if (!bundle) return null;
+    const html = bundle.previewHtml || bundle.html;
+    if (!NATIVE && !html) return null;
+    const frame = document.createElement("iframe");
+    frame.className = "frame";
+    frame.setAttribute("sandbox", "allow-scripts");
+    if (NATIVE) {
+      frame.src = widgetUrl(bundle.id, bundle.preview || "");
+    } else {
+      frame.srcdoc = html;
+    }
+    // Feed it the same config the overlay will, so colours and options show.
+    frame.addEventListener("load", () => {
+      frame.contentWindow?.postMessage(
+        { source: "quicktys", type: "config", config: placed.config ?? {} },
+        "*",
+      );
+      frame.contentWindow?.postMessage({ source: "quicktys", type: "state", state: {} }, "*");
+    });
+    return frame;
+  }
+
   // ---- render -------------------------------------------------------------
   const $ = (id) => document.getElementById(id);
   function render() {
@@ -393,34 +686,74 @@
     const canvas = document.createElement("div");
     canvas.className = "canvas " + (o.aspect === "9:16" ? "portrait" : "landscape");
     if (!o.widgets.length) {
-      const h = document.createElement("p"); h.className = "hint"; h.textContent = S.hint; canvas.appendChild(h);
+      const h = document.createElement("p");
+      h.className = "hint";
+      h.textContent = S.hint;
+      canvas.appendChild(h);
     }
     for (const w of o.widgets) {
+      const bundle = bundleOf(w.type);
       const node = document.createElement("div");
-      node.className = "node"; node.id = "node-" + w.id;
+      node.className = "node" + (w.id === selectedId ? " sel" : "");
+      node.id = "node-" + w.id;
       node.style.cssText = `left:${w.x}%;top:${w.y}%;width:${w.w}%;height:${w.h}%`;
-      const lbl = document.createElement("div"); lbl.className = "lbl"; lbl.textContent = widgetName(w.type); node.appendChild(lbl);
-      const mv = document.createElement("div"); mv.className = "move";
-      const handle = document.createElement("span");
-      handle.textContent = "⠿ " + widgetName(w.type);
-      const cg = document.createElement("span");
-      cg.className = "cg"; cg.title = S.settings; cg.textContent = "⚙";
-      const rm = document.createElement("span");
-      rm.className = "rm"; rm.title = "Remove"; rm.textContent = "✕";
-      mv.append(handle, cg, rm);
-      // The bar is the drag handle, except on its two buttons.
-      mv.onmousedown = (e) => {
-        if (e.target.classList.contains("rm") || e.target.classList.contains("cg")) return;
-        e.preventDefault(); startMove(e, w, canvas.getBoundingClientRect());
+
+      // WYSIWYG: render the ACTUAL widget, inert. `pointer-events: none` keeps
+      // every click for the editor, so the preview can never eat a drag.
+      const frame = widgetFrame(bundle, w);
+      if (frame) node.appendChild(frame);
+
+      const lbl = document.createElement("div");
+      lbl.className = "lbl";
+      lbl.textContent = widgetName(w.type);
+      node.appendChild(lbl);
+
+      // Toolbar INSIDE the node — the old one sat above it and was clipped by
+      // the canvas whenever a widget touched the top edge.
+      const bar = document.createElement("div");
+      bar.className = "bar";
+      const button = (cls, text, title, onClick) => {
+        const b = document.createElement("span");
+        b.className = cls;
+        b.textContent = text;
+        b.title = title;
+        b.onmousedown = (e) => e.stopPropagation();
+        b.onclick = (e) => { e.stopPropagation(); onClick(e); };
+        return b;
       };
-      cg.onclick = (e) => { e.stopPropagation(); openConfig(w, cg); };
-      rm.onclick = (e) => { e.stopPropagation(); removeWidget(w.id); };
-      node.appendChild(mv);
-      const rz = document.createElement("div"); rz.className = "rz";
-      rz.onmousedown = (e) => { e.preventDefault(); startResize(e, w, canvas.getBoundingClientRect()); };
-      node.appendChild(rz);
+      bar.append(
+        button("z", "▾", S.sendBack, () => reorder(w.id, -1)),
+        button("z", "▴", S.bringFront, () => reorder(w.id, 1)),
+        button("cg", "⚙", S.settings, (e) => openConfig(w, e.currentTarget)),
+        button("rm", "✕", S.remove, () => removeWidget(w.id)),
+      );
+      node.appendChild(bar);
+
+      for (const dir of ["nw", "n", "ne", "e", "se", "s", "sw", "w"]) {
+        const h = document.createElement("div");
+        h.className = "h " + dir;
+        h.onmousedown = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          startResize(e, w, canvas.getBoundingClientRect(), dir);
+        };
+        node.appendChild(h);
+      }
+
+      // Drag from anywhere on the node.
+      node.onmousedown = (e) => {
+        e.preventDefault();
+        startMove(e, w, canvas.getBoundingClientRect());
+      };
       canvas.appendChild(node);
     }
+    // Clicking the empty canvas clears the selection.
+    canvas.onmousedown = (e) => {
+      if (e.target === canvas) {
+        select(null);
+        closeConfig();
+      }
+    };
     stage.innerHTML = ""; stage.appendChild(canvas);
   }
 
@@ -453,6 +786,7 @@
   function applyStrings() {
     $("t-title").textContent = S.title; $("t-new").textContent = S.new; $("t-new2").textContent = S.new2;
     $("t-add").textContent = S.add; $("t-none").textContent = S.none;
+    $("t-hint2").textContent = S.hint2;
   }
 
   // Tell the host we're ready → it replies with `init`.

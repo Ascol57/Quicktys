@@ -72,7 +72,20 @@ UIs with separate code: a settings form added to one is missing from the other. 
 editor's per-widget ⚙ panel renders the same schema kinds as `WidgetConfigForm.vue`; since a
 sandboxed module page has no access to the app's i18n, `ViewFrame.vue` resolves the labels
 (`widget.<id>.name`, `…config.<key>`, `…options.<key>.<value>`) and ships them in the `init`
-message as `label` / `configLabels` / `optionLabels`. Two widget kinds:
+message as `label` / `configLabels` / `optionLabels`.
+
+**The overlay editor is WYSIWYG.** Each placed widget renders for real in a sandboxed iframe —
+`widget://localhost/<id>/<preview>` natively, `srcdoc` from the manifest's embedded
+`previewHtml`/`html` in the browser mock — made **inert with `pointer-events: none`** so the
+editor keeps every click and a preview can never swallow a drag. It is fed the same `config`
+message the overlay sends, so colours and options show. Interaction: **drag from anywhere on the
+node** (the old design put the drag bar at `top: -1.5rem`, *outside* the node, which the canvas'
+`overflow: hidden` clipped the moment a widget touched the top edge — the widget then became
+impossible to move; the toolbar now lives inside the node), eight resize handles, arrow-key
+nudge (Shift ×10), Delete to remove, Escape to deselect, ▴/▾ for z-order (paint order **is**
+array order, so raising = moving later in `o.widgets`). Edges snap within 1.2% to the canvas
+sides/centre and to every other widget's sides/centre, drawing a guide for whatever matched;
+**Alt places freely**. Geometry is rounded on drop so the stored percentages match the readout. Two widget kinds:
 **built-in** (`template` → an in-app Vue component, e.g. `info` → `InfoWidget.vue`, a count box
 for a chosen source) and **runtime** (ships `index.html` → rendered by `WidgetFrame.vue` in a
 **sandboxed iframe**, `sandbox="allow-scripts"`). Native loads the iframe from a custom
@@ -338,7 +351,8 @@ session (GTK/webkit2gtk); it won't initialize under a headless/flaky display.
 
 `tauri.conf.json` `security.csp` is set (was `null`): `img-src`/`media-src` allow the Pear
 player (`http://127.0.0.1:26538`) + YouTube Music cover hosts (`*.googleusercontent.com`,
-`*.ytimg.com`, `*.ggpht.com`); `frame-src` allows `widget:` (runtime widgets load from the
+`*.ytimg.com`, `*.ggpht.com`) + the Twitch CDN `static-cdn.jtvnw.net` (chat emotes and badge
+images); `frame-src` allows `widget:` (runtime widgets load from the
 custom scheme, see Widgets above, so they're NOT inline in the app document); `script-src`/
 `style-src` keep `'unsafe-inline'` for the Vue/PrimeVue app. **Untested under the native webview
 here** (headless); if the webview's IPC breaks, verify/relax it in `cargo run -p quicktys-app`
