@@ -1,0 +1,29 @@
+{
+  "id": "countdown",
+  "kind": "widget",
+  "name": "Countdown",
+  "icon": "pi pi-stopwatch",
+  "runtime": "html",
+  "entry": "index.html",
+  "preview": "preview.html",
+  "requires": ["countdown"],
+  "defaultW": 2,
+  "defaultH": 1,
+  "config": {
+    "type": "Object",
+    "properties": {
+      "name": { "type": "String", "default": "timer" },
+      "format": { "type": "String", "enum": ["auto", "mm:ss", "h:mm:ss", "seconds"], "default": "auto" },
+      "showLabel": { "type": "Boolean", "default": true },
+      "showProgress": { "type": "Boolean", "default": true },
+      "showWhenIdle": { "type": "Boolean", "default": true },
+      "showBackground": { "type": "Boolean", "default": true },
+      "warnAt": { "type": "Number", "default": 10, "min": 0, "max": 300 },
+      "textColor": { "type": "Color", "default": "#ffffff" },
+      "warnColor": { "type": "Color", "default": "#d3695f" },
+      "accentColor": { "type": "Color", "default": "#e0a458" },
+      "bgColor": { "type": "Color", "default": "#1e1e1e" },
+      "radius": { "type": "Number", "default": 14, "min": 0, "max": 60 }
+    }
+  }
+}

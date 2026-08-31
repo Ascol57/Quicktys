@@ -1,0 +1,18 @@
+{
+  "name": "Compte à rebours",
+  "description": "Une horloge de compte à rebours pilotée par le plugin Compte à rebours, avec libellé et barre de progression optionnels.",
+  "config": {
+    "name": "Nom du compte à rebours",
+    "format": "Format de l'heure",
+    "showLabel": "Afficher le libellé",
+    "showProgress": "Afficher la barre de progression",
+    "showWhenIdle": "Afficher au repos",
+    "showBackground": "Afficher le fond",
+    "warnAt": "Alerte en dessous de (secondes)",
+    "textColor": "Texte",
+    "warnColor": "Alerte",
+    "accentColor": "Barre de progression",
+    "bgColor": "Fond",
+    "radius": "Arrondi des coins"
+  }
+}

@@ -19,6 +19,19 @@ The user handles all `git commit`/`git push` himself — do not run them.
 
 ## Build & check
 
+**From a bare clone**, [setup/](setup/) does the whole thing per OS:
+`setup/setup-macos.sh` | `setup-linux.sh` | `setup-windows.ps1` install the
+prerequisites (native toolchain + GTK/WebKit or WebView2, Rust + the
+`wasm32-wasip2` target, Node, npm packages) **and generate the dev keys**;
+`setup/run.sh` (`run-windows.ps1`) builds bundles + frontend then starts the
+registry server and the app — it delegates the full path to `dev.sh`. `dist/` is
+gitignored, so a clone has **no keys**: `setup/gen-keys.sh` creates the dev CA
+(`dist/ca.key`/`.pub`, certifies modules, pinned via `QUICKTYS_CA`) and the store
+key (`dist/store.key`/`.pub`, signs licences, pinned via `QUICKTYS_STORE`), both
+idempotently — it never overwrites. Content keys (`dist/secrets/*.ck`) and
+`dist/pear.license` come from the packing step. Details + per-OS gotchas in
+[setup/README.md](setup/README.md).
+
 Two separate build domains:
 
 ```bash
@@ -77,6 +90,24 @@ defensively across YouTube-renderer shapes into `pear.queue` = `[{title,artist,t
 videoId,selected}]`, with a fallback across endpoints + console logging). Verify the API
 against the pear-desktop repo, don't guess. `list_plugins`/`list_modules`/`list_widgets` feed
 the dashboard counts + widget catalogue.
+
+**`countdown` (plugin + widget) — the "who ticks?" pattern.** `plugins/countdown` holds
+**named** timers like `alert` does (`start`/`add`/`pause`/`resume`/`stop`, each taking a
+`name`, default `timer`), published as `countdown.<name>` = `{running, endAt, remainingMs,
+remaining, totalMs, display, label, seq}`. Nothing ticks host-side: `endAt` is an **absolute
+epoch-ms instant**, so `widgets/countdown` derives the remaining time locally on a 100ms
+interval — a second-accurate display with zero host load, and no `timers` cap (which the
+plugin tier doesn't get). Consequence for the **`finished` trigger**: a plugin is never
+polled (only *modules* declaring a `poll` service are, every 3s), so the widget reports the
+zero-crossing back through the `report-finished` action, which calls `reactivity.emit-trigger`.
+The run's `seq` dedups it across several widgets showing the same countdown — **so a countdown
+nobody displays never fires the trigger**. Give it a host-side tick by adding a `countdown`
+module with a `poll` service (no capability needed → no certification, like `webview`).
+Timers persist through the plugin-tier `storage` cap (`kv-get`/`kv-set`, first plugin to use
+it); a run that expired while the app was closed is restored finished and pre-acknowledged, so
+boot fires nothing — same rule as `pear`'s first observation. Widget booleans all default
+**true** and are read as `!== false`, because `WidgetConfigForm.vue` renders an unset boolean
+as ON (`get(key) !== false`) — name them `showX`, never `hideX`, or the switch lies.
 
 Reference extensions used by the host integration tests (built on demand): `plugins/time`
 (plugin, no module), `plugins/notify` (a plugin with `log`/`toast` actions — `toast` uses the

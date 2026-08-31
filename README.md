@@ -11,6 +11,19 @@ Réécriture de [CastMate](../) en **Rust + Tauri**, avec des **plugins WebAssem
 > l'instant. Voir [`ARCHITECTURE.md`](ARCHITECTURE.md) et
 > [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
+## Démarrer
+
+Depuis un clone nu, un script par OS installe les prérequis, génère les clés de
+développement, puis construit et lance le tout :
+
+```bash
+./setup/setup-macos.sh     # ou setup-linux.sh — Windows : setup\setup-windows.ps1
+./setup/run.sh             # construit, puis lance le serveur (registry) + le client (app)
+```
+
+`./setup/run.sh --solo` lance l'app seule, `--web` le frontend dans le
+navigateur. Détails, options et pièges par OS : [`setup/README.md`](setup/README.md).
+
 ## Trois types d'extension
 
 | Type        | Qui le développe         | Rôle | Confiance / capacités |

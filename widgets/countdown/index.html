@@ -1,0 +1,209 @@
+<!doctype html>
+<!-- Countdown widget (real). Reads the reactive state key `countdown.<name>`
+     published by the `countdown` plugin and ticks locally: `endAt` is an
+     absolute wall-clock instant, so the remaining time is derived here on a
+     timer rather than being pushed from the host every second.
+
+     When a running countdown reaches zero this posts the plugin's
+     `report-finished` action back to the app, which is what fires the
+     `countdown.finished` trigger. It carries the run's `seq`, and the plugin
+     dedups on it, so several widgets showing the same countdown fire it once.
+
+     The editor renders `preview.html` instead (a self-demo loop), so this file
+     stays purely the real behaviour: idle and transparent until a countdown is
+     actually started. -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: transparent; }
+      body {
+        font-family: system-ui, sans-serif;
+        display: flex; align-items: center; justify-content: center;
+        overflow: hidden;
+        container-type: size; /* descendants' cq units scale with the widget */
+        padding: min(10px, 3vmin);
+        --text: #fff; --warn: #d3695f; --accent: #e0a458; --bg: #1e1e1e;
+        --radius: 14px;
+      }
+      .box {
+        width: 100%; height: 100%; min-width: 0; min-height: 0;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        gap: min(0.35rem, 2cqmin);
+        padding: min(0.75rem, 5cqmin);
+        border-radius: var(--radius);
+        transition: opacity 0.25s ease;
+      }
+      body.bg .box { background: var(--bg); }
+      body.hidden .box { opacity: 0; }
+      .label {
+        color: var(--text); opacity: 0.7;
+        font-size: min(0.95rem, 11cqh); line-height: 1.1;
+        max-width: 100%; text-align: center;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .time {
+        color: var(--text);
+        font-weight: 800; line-height: 1;
+        font-variant-numeric: tabular-nums;
+        /* Fill the box: bounded by height and by width, so long formats
+           (h:mm:ss) shrink instead of overflowing. */
+        font-size: min(46cqh, 21cqw);
+        transition: color 0.2s ease;
+      }
+      body.warn .time { color: var(--warn); }
+      body.done .time { color: var(--warn); animation: pulse 1s ease-in-out infinite; }
+      body.paused .time { opacity: 0.55; }
+      @keyframes pulse { 50% { opacity: 0.45; } }
+      .bar {
+        width: 100%; max-width: 100%;
+        height: max(3px, 2cqh);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.16);
+        overflow: hidden;
+      }
+      .bar__fill {
+        height: 100%; width: 0%;
+        background: var(--accent);
+        border-radius: 999px;
+        transition: width 0.2s linear, background-color 0.2s ease;
+      }
+      body.warn .bar__fill, body.done .bar__fill { background: var(--warn); }
+      .off { display: none !important; }
+      @media (prefers-reduced-motion: reduce) {
+        body.done .time { animation: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <div class="label off" id="label"></div>
+      <div class="time" id="time">00:00</div>
+      <div class="bar off" id="bar"><div class="bar__fill" id="fill"></div></div>
+    </div>
+
+    <script>
+      let state = {};
+      let config = {};
+      // Run we already reported as finished, so we post the action only once.
+      let reported = 0;
+
+      const $ = (id) => document.getElementById(id);
+      const on = (key) => config[key] !== false; // unset booleans default to ON
+      const timerName = () => config.name || "timer";
+      const current = () => {
+        const t = state["countdown." + timerName()];
+        return t && typeof t === "object" ? t : null;
+      };
+
+      function applyConfig() {
+        const s = document.body.style;
+        const set = (k, v) => v !== undefined && s.setProperty(k, v);
+        set("--text", config.textColor);
+        set("--warn", config.warnColor);
+        set("--accent", config.accentColor);
+        set("--bg", config.bgColor);
+        if (config.radius !== undefined) s.setProperty("--radius", config.radius + "px");
+        document.body.classList.toggle("bg", on("showBackground"));
+      }
+
+      function format(ms) {
+        const total = Math.ceil(Math.max(0, ms) / 1000);
+        const h = Math.floor(total / 3600);
+        const m = Math.floor((total % 3600) / 60);
+        const s = total % 60;
+        const pad = (n) => String(n).padStart(2, "0");
+        switch (config.format) {
+          case "seconds":
+            return String(total);
+          case "mm:ss":
+            return `${pad(Math.floor(total / 60))}:${pad(s)}`;
+          case "h:mm:ss":
+            return `${h}:${pad(m)}:${pad(s)}`;
+          default: // auto — grow to hours only when needed
+            return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+        }
+      }
+
+      function reportFinished(t) {
+        reported = t.seq || 0;
+        parent.postMessage(
+          {
+            source: "quicktys-widget",
+            type: "action",
+            plugin: "countdown",
+            action: "report-finished",
+            config: { name: timerName(), seq: t.seq || 0 },
+          },
+          "*",
+        );
+      }
+
+      function tick() {
+        const t = current();
+        const body = document.body;
+        if (!t) {
+          // No such countdown yet: idle.
+          body.classList.toggle("hidden", !on("showWhenIdle"));
+          body.classList.remove("warn", "done", "paused");
+          $("time").textContent = format(0);
+          $("label").classList.add("off");
+          $("bar").classList.add("off");
+          return;
+        }
+
+        const remaining = t.running
+          ? Math.max(0, (t.endAt || 0) - Date.now())
+          : Math.max(0, t.remainingMs || 0);
+        const done = remaining <= 0;
+        const idle = !t.running && done;
+
+        // A run that just hit zero is reported back once — that is what fires
+        // the plugin's `finished` trigger.
+        if (t.running && done && t.seq && t.seq !== reported) reportFinished(t);
+        // A fresh run re-arms the report.
+        if (t.running && !done && t.seq !== reported) reported = 0;
+
+        body.classList.toggle("hidden", idle && !on("showWhenIdle"));
+        body.classList.toggle("paused", !t.running && !done);
+        body.classList.toggle("done", done && !idle);
+        const warnAt = Number(config.warnAt ?? 10);
+        body.classList.toggle("warn", !done && warnAt > 0 && remaining <= warnAt * 1000);
+
+        $("time").textContent = format(remaining);
+
+        const label = on("showLabel") ? String(t.label || "") : "";
+        $("label").textContent = label;
+        $("label").classList.toggle("off", !label);
+
+        const total = Number(t.totalMs || 0);
+        const showBar = on("showProgress") && total > 0 && !idle;
+        $("bar").classList.toggle("off", !showBar);
+        if (showBar) $("fill").style.width = Math.min(100, (remaining / total) * 100) + "%";
+      }
+
+      window.addEventListener("message", (e) => {
+        const d = e.data;
+        if (!d || d.source !== "quicktys") return;
+        if (d.type === "config") {
+          config = d.config || {};
+          applyConfig();
+        } else if (d.type === "state") {
+          state = d.state || {};
+          // Don't re-report a run that already ended before this widget loaded.
+          const t = current();
+          if (t && !t.running) reported = t.seq || 0;
+        }
+        tick();
+      });
+
+      applyConfig();
+      // 100ms keeps the progress bar smooth; the text only changes on seconds.
+      setInterval(tick, 100);
+      tick();
+      parent.postMessage({ source: "quicktys-widget", type: "ready" }, "*");
+    </script>
+  </body>
+</html>

@@ -1,0 +1,48 @@
+{
+  "name": "Compte à rebours",
+  "description": "Des comptes à rebours nommés, pilotés depuis les automations et affichés par le widget Compte à rebours.",
+  "fields": {
+    "name": "Compte à rebours"
+  },
+  "actions": {
+    "start": {
+      "name": "Démarrer le compte à rebours",
+      "description": "Démarre (ou redémarre) un compte à rebours pour la durée indiquée.",
+      "config": {
+        "duration": "Durée",
+        "label": "Libellé"
+      }
+    },
+    "add": {
+      "name": "Ajouter du temps",
+      "description": "Rallonge le compte à rebours. Une valeur négative en retire.",
+      "config": {
+        "seconds": "Secondes"
+      }
+    },
+    "pause": { "name": "Mettre en pause" },
+    "resume": { "name": "Reprendre" },
+    "stop": { "name": "Arrêter" },
+    "report-finished": {
+      "name": "Signaler la fin",
+      "description": "Déclenche le trigger « Compte à rebours terminé ». Un widget affiché le fait tout seul quand le compte à rebours atteint zéro ; sert à le terminer par anticipation.",
+      "config": {
+        "seq": "Identifiant du tour (laisser vide)"
+      }
+    }
+  },
+  "triggers": {
+    "finished": {
+      "name": "Compte à rebours terminé",
+      "description": "Se déclenche quand un compte à rebours atteint zéro. Nécessite qu'un widget l'affiche.",
+      "context": {
+        "name": "Compte à rebours",
+        "label": "Libellé"
+      }
+    }
+  },
+  "state": {
+    "timer": { "name": "Minuteur" }
+  },
+  "settings": {}
+}

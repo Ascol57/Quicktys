@@ -1,0 +1,48 @@
+{
+  "name": "Countdown",
+  "description": "Named countdown timers, driven from automations and displayed by the Countdown widget.",
+  "fields": {
+    "name": "Countdown"
+  },
+  "actions": {
+    "start": {
+      "name": "Start countdown",
+      "description": "Start (or restart) a countdown for the given duration.",
+      "config": {
+        "duration": "Duration",
+        "label": "Label"
+      }
+    },
+    "add": {
+      "name": "Add time",
+      "description": "Extend the countdown. Use a negative value to take time away.",
+      "config": {
+        "seconds": "Seconds"
+      }
+    },
+    "pause": { "name": "Pause countdown" },
+    "resume": { "name": "Resume countdown" },
+    "stop": { "name": "Stop countdown" },
+    "report-finished": {
+      "name": "Signal countdown end",
+      "description": "Fire the Countdown finished trigger. A displayed widget calls this on its own when the countdown reaches zero; use it to end one early.",
+      "config": {
+        "seq": "Run id (leave empty)"
+      }
+    }
+  },
+  "triggers": {
+    "finished": {
+      "name": "Countdown finished",
+      "description": "Fires when a countdown reaches zero. Requires the countdown to be displayed by a widget.",
+      "context": {
+        "name": "Countdown",
+        "label": "Label"
+      }
+    }
+  },
+  "state": {
+    "timer": { "name": "Timer" }
+  },
+  "settings": {}
+}

@@ -1,0 +1,137 @@
+<!doctype html>
+<!-- Countdown PREVIEW: used only by the in-app editor (WidgetFrame loads it in
+     place of index.html when previewing). It receives the widget's config
+     through the same postMessage bridge, then loops a fake 90s run so you can
+     design the look — colours, format, warning threshold — without starting a
+     real countdown. The browser source (OBS) never loads this file: it always
+     uses index.html, which stays idle until a real countdown is started. -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: transparent; }
+      body {
+        font-family: system-ui, sans-serif;
+        display: flex; align-items: center; justify-content: center;
+        overflow: hidden;
+        container-type: size;
+        padding: min(10px, 3vmin);
+        --text: #fff; --warn: #d3695f; --accent: #e0a458; --bg: #1e1e1e;
+        --radius: 14px;
+      }
+      .box {
+        width: 100%; height: 100%; min-width: 0; min-height: 0;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        gap: min(0.35rem, 2cqmin);
+        padding: min(0.75rem, 5cqmin);
+        border-radius: var(--radius);
+      }
+      body.bg .box { background: var(--bg); }
+      .label {
+        color: var(--text); opacity: 0.7;
+        font-size: min(0.95rem, 11cqh); line-height: 1.1;
+        max-width: 100%; text-align: center;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .time {
+        color: var(--text);
+        font-weight: 800; line-height: 1;
+        font-variant-numeric: tabular-nums;
+        font-size: min(46cqh, 21cqw);
+        transition: color 0.2s ease;
+      }
+      body.warn .time { color: var(--warn); }
+      .bar {
+        width: 100%; max-width: 100%;
+        height: max(3px, 2cqh);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.16);
+        overflow: hidden;
+      }
+      .bar__fill {
+        height: 100%; width: 100%;
+        background: var(--accent);
+        border-radius: 999px;
+        transition: width 0.2s linear, background-color 0.2s ease;
+      }
+      body.warn .bar__fill { background: var(--warn); }
+      .off { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <div class="label off" id="label"></div>
+      <div class="time" id="time">01:30</div>
+      <div class="bar off" id="bar"><div class="bar__fill" id="fill"></div></div>
+    </div>
+
+    <script>
+      let config = {};
+      const TOTAL = 90000; // the demo run, looped
+      let started = Date.now();
+
+      const $ = (id) => document.getElementById(id);
+      const on = (key) => config[key] !== false;
+
+      function applyConfig() {
+        const s = document.body.style;
+        const set = (k, v) => v !== undefined && s.setProperty(k, v);
+        set("--text", config.textColor);
+        set("--warn", config.warnColor);
+        set("--accent", config.accentColor);
+        set("--bg", config.bgColor);
+        if (config.radius !== undefined) s.setProperty("--radius", config.radius + "px");
+        document.body.classList.toggle("bg", on("showBackground"));
+      }
+
+      function format(ms) {
+        const total = Math.ceil(Math.max(0, ms) / 1000);
+        const h = Math.floor(total / 3600);
+        const m = Math.floor((total % 3600) / 60);
+        const s = total % 60;
+        const pad = (n) => String(n).padStart(2, "0");
+        switch (config.format) {
+          case "seconds": return String(total);
+          case "mm:ss": return `${pad(Math.floor(total / 60))}:${pad(s)}`;
+          case "h:mm:ss": return `${h}:${pad(m)}:${pad(s)}`;
+          default: return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+        }
+      }
+
+      function tick() {
+        let remaining = TOTAL - (Date.now() - started);
+        if (remaining <= 0) {
+          started = Date.now(); // loop the demo
+          remaining = TOTAL;
+        }
+        const warnAt = Number(config.warnAt ?? 10);
+        document.body.classList.toggle("warn", warnAt > 0 && remaining <= warnAt * 1000);
+        $("time").textContent = format(remaining);
+
+        const label = on("showLabel") ? config.name || "timer" : "";
+        $("label").textContent = label;
+        $("label").classList.toggle("off", !label);
+
+        $("bar").classList.toggle("off", !on("showProgress"));
+        $("fill").style.width = (remaining / TOTAL) * 100 + "%";
+      }
+
+      window.addEventListener("message", (e) => {
+        const d = e.data;
+        if (!d || d.source !== "quicktys") return;
+        if (d.type === "config") {
+          config = d.config || {};
+          applyConfig();
+          tick();
+        }
+      });
+
+      applyConfig();
+      setInterval(tick, 100);
+      tick();
+      parent.postMessage({ source: "quicktys-widget", type: "ready" }, "*");
+    </script>
+  </body>
+</html>

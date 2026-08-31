@@ -1,0 +1,18 @@
+{
+  "name": "Countdown",
+  "description": "A countdown clock driven by the Countdown plugin, with an optional label and progress bar.",
+  "config": {
+    "name": "Countdown name",
+    "format": "Time format",
+    "showLabel": "Show label",
+    "showProgress": "Show progress bar",
+    "showWhenIdle": "Show when idle",
+    "showBackground": "Show background",
+    "warnAt": "Warn under (seconds)",
+    "textColor": "Text",
+    "warnColor": "Warning",
+    "accentColor": "Progress bar",
+    "bgColor": "Background",
+    "radius": "Corner radius"
+  }
+}

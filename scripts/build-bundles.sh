@@ -41,6 +41,7 @@ EXTENSIONS=(
   "module:modules/twitch:twitch:twitch.wasm:certified"
   "plugin:plugins/twitch:twitch:twitch_plugin.wasm"
   "plugin:plugins/random:random:random.wasm"
+  "plugin:plugins/countdown:countdown:countdown.wasm"
 )
 
 # Widgets are frontend-only (no WASM): the source dir already IS the bundle
@@ -52,6 +53,7 @@ WIDGETS=(
   "widget:widgets/pear-queue:pear-queue"
   "widget:widgets/pear-music:pear-music"
   "widget:widgets/alert:alert"
+  "widget:widgets/countdown:countdown"
 )
 
 bundle_one() {
