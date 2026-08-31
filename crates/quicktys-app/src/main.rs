@@ -764,6 +764,11 @@ fn build_backend(app: &tauri::App) -> anyhow::Result<Arc<AppBackend>> {
     // loading so each extension's storage loads.
     host.set_storage_dir(data.root().join("storage"));
 
+    // Connected accounts, so "connect once" is actually once: a device-code
+    // authorization would otherwise have to be re-approved on Twitch at every
+    // launch. Refresh tokens are long-lived; the file is 0600 (see oauth.rs).
+    host.set_oauth_store(data.root().join("oauth.json"));
+
     // Pinned store keys (M6.8), needed early so encrypted installed packages can
     // be decrypted at boot from a covering license. `QUICKTYS_STORE` (comma-sep
     // hex) — the dev store key printed by `quicktys-pack --issue-license`.

@@ -245,8 +245,52 @@ module/plugin; needs a desktop session). OAuth is real (token store + transparen
 `src/oauth.rs`). Remaining stubs: `audio.play-buffer`, the streaming socket calls, and the other
 device caps (hid/files/timers) — wired when a driver needs them. A module reaches the system caps only if it is **certified**
 (uncertified modules that declare capabilities are refused at load — but `storage`/`logging`/
-`events` are safe and need no certification, e.g. the `webview` module). `wss` and streaming
-`ws-connect` → `on-host-event` remain.
+`events` are safe and need no certification, e.g. the `webview` module).
+
+**`wss://` is now real (`ws.rs`).** Twitch decommissioned its unencrypted WebSocket endpoint, so
+live chat forced it. The subtlety: a `WsConn` is read by a blocking reader thread while the host
+writes from another (`net.send`). Plain TCP just clones the socket; **a TLS session cannot be
+cloned** — one `ClientConnection` encrypts both directions. So `Transport::Tls` shares the
+session behind a `Mutex` and the reader does its *blocking* socket read **outside** the lock,
+locking only to feed bytes into rustls; otherwise a blocked read would starve every send. The
+handshake is completed with `complete_io` before the halves are split.
+
+**Live Twitch chat (module → plugin → widget).** `modules/twitch` opens
+`wss://irc-ws.chat.twitch.tv:443` (`connect-chat {channel}`, overridable via `set-chat-url` so
+tests use a stand-in), requests `twitch.tv/tags twitch.tv/commands`, and logs in **anonymously**
+(`NICK justinfan<n>`, no PASS): a read-only feed is all a chat *display* needs, so the widget
+works with no account connected and no token crosses the wire. It answers PINGs, parses IRCv3
+tags (colour, display-name, badges, emote positions — `\s`-escaping decoded) and emits `chat`.
+`plugins/twitch` buffers the last 200 into the reactive `twitch.chat` list and fires
+`twitch.chat-message`. `widgets/twitch-chat` renders it. Gotchas: emote positions are in **code
+points**, so split with `Array.from` or an earlier emoji shifts every emote; host events carry
+raw transport text, so the module SDK now hands a non-JSON payload through as a
+`Value::String` instead of losing it to `null`. Covered by `tests/twitch_chat.rs`.
+
+**EventSub (follow / subscribe / raid).** `connect-events {channel}` (overridable via
+`set-eventsub-url`) opens `wss://eventsub.wss.twitch.tv/ws`; on `session_welcome` the module
+creates the subscriptions over Helix with `transport:{method:"websocket",session_id}` — **within
+10s or Twitch closes with 4003**. Exact shapes matter: `channel.follow` is **v2** (v1 is
+rejected) and needs BOTH `broadcaster_user_id` and `moderator_user_id` (the *authenticated* user,
+from Helix `/users` with no login) plus the `moderator:read:followers` scope; `channel.subscribe`
+is v1 + `channel:read:subscriptions`; `channel.raid` is v1, no scope, and takes `to_` (raids
+into us) — `from_`/`to_` are mutually exclusive. Notifications become module events
+`follow`/`subscribe`/`raid`, which the plugin bridges to the same-named triggers.
+`session_reconnect` re-dials the given URL; `session_keepalive` is ignored. Unlike chat this
+needs a **user token**, so it only works with a connected account. Covered by
+`tests/twitch_eventsub.rs`.
+
+**Badge images.** The IRC `badges` tag is kept as `set/version` (the version selects the image:
+`subscriber/12` ≠ `subscriber/1`). `chat-badges {channel}` merges Helix
+`/chat/badges/global` + `/chat/badges?broadcaster_id=` into `set/version → URL`, published as
+`twitch.badges`; the widget falls back to coloured text pills when the map is empty (an
+anonymous chat has no token, so no images).
+
+**Tokens persist.** `TokenStore::set_path` (wired at boot to `<data>/oauth.json`, `0600` on
+unix) reloads token-sets **and** the provider envs a refresh needs; an already-dead,
+unrefreshable token is dropped rather than reloaded as a fake "connected". Expiry is stored as
+absolute **unix seconds** — an `Instant` is monotonic and meaningless across a restart, which is
+exactly when it is read. Still plain JSON: the OS keyring is the next step.
 
 **Connecting an account — OAuth Device Code (`oauth.rs`).** The WIT `oauth.authorize` is still
 a stub **on purpose**: it is a *synchronous* call with nowhere to hand back a user code for the

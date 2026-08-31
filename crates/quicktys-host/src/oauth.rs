@@ -18,18 +18,41 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 /// Refresh this long before actual expiry, to avoid races near the boundary.
-const EXPIRY_SKEW: Duration = Duration::from_secs(30);
+const EXPIRY_SKEW_SECS: u64 = 30;
 
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 struct TokenSet {
     access: String,
     refresh: Option<String>,
-    expires_at: Option<Instant>,
+    /// Absolute expiry, **unix seconds**. An `Instant` is monotonic-clock based
+    /// and meaningless after a restart, which is exactly when we reload these.
+    #[serde(default)]
+    expires_at: Option<u64>,
 }
 
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 struct ProviderEnv {
     token_url: String,
     client_id: String,
+    #[serde(default)]
     client_secret: Option<String>,
+}
+
+/// What lands on disk: the token-sets plus the provider envs they need in order
+/// to refresh. Without the envs a reloaded refresh token would be unusable.
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+struct Persisted {
+    #[serde(default)]
+    tokens: HashMap<String, TokenSet>,
+    #[serde(default)]
+    providers: HashMap<String, ProviderEnv>,
+}
+
+fn now_unix() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 /// Per-provider OAuth token storage with transparent refresh.
@@ -39,6 +62,8 @@ pub struct TokenStore {
     providers: Mutex<HashMap<String, ProviderEnv>>,
     /// Device authorizations currently awaiting the user's approval.
     pending: Mutex<HashMap<String, PendingDevice>>,
+    /// Where the token-sets are persisted. `None` → memory only (tests).
+    path: Mutex<Option<std::path::PathBuf>>,
 }
 
 /// The subset of a token endpoint response we consume.
@@ -129,6 +154,62 @@ impl TokenStore {
         Self::default()
     }
 
+    /// Back the store with a file, loading whatever it already holds.
+    ///
+    /// Without this a connected account is forgotten at every restart, which for
+    /// a device-code flow means re-approving on Twitch each launch. Refresh
+    /// tokens are long-lived, so persisting them is what makes "connect once"
+    /// true.
+    ///
+    /// ⚠️ Stored as plain JSON, `0600` on unix. That protects it from other
+    /// users on the machine, **not** from anything running as this user. The
+    /// next step is the OS keyring; until then, treat the file as a secret.
+    pub fn set_path(&self, path: std::path::PathBuf) {
+        if let Ok(bytes) = std::fs::read(&path) {
+            if let Ok(loaded) = serde_json::from_slice::<Persisted>(&bytes) {
+                let mut tokens = self.tokens.lock().unwrap();
+                let mut providers = self.providers.lock().unwrap();
+                // Drop anything already dead and unrefreshable rather than
+                // reload a token that can only fail.
+                for (provider, set) in loaded.tokens {
+                    let dead = set.refresh.is_none()
+                        && set.expires_at.is_some_and(|at| now_unix() >= at);
+                    if !dead {
+                        tokens.insert(provider, set);
+                    }
+                }
+                providers.extend(loaded.providers);
+            }
+        }
+        *self.path.lock().unwrap() = Some(path);
+    }
+
+    /// Write the current token-sets out. Best-effort: a failure to persist must
+    /// never break an otherwise working authorization.
+    fn save(&self) {
+        let path = self.path.lock().unwrap().clone();
+        let Some(path) = path else { return };
+        let snapshot = Persisted {
+            tokens: self.tokens.lock().unwrap().clone(),
+            providers: self.providers.lock().unwrap().clone(),
+        };
+        let Ok(bytes) = serde_json::to_vec_pretty(&snapshot) else {
+            return;
+        };
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if std::fs::write(&path, bytes).is_err() {
+            tracing::warn!("could not persist oauth tokens to {}", path.display());
+            return;
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
+        }
+    }
+
     /// Register the provider env (from a module's `provider-config`), needed for
     /// later refreshes.
     pub fn set_provider(
@@ -146,6 +227,7 @@ impl TokenStore {
                 client_secret: client_secret.map(str::to_string),
             },
         );
+        self.save();
     }
 
     /// Seed a token-set (e.g. right after an interactive authorization, or in
@@ -164,9 +246,10 @@ impl TokenStore {
             TokenSet {
                 access: access.to_string(),
                 refresh: refresh.map(str::to_string),
-                expires_at: expires_in.map(|s| Instant::now() + Duration::from_secs(s)),
+                expires_at: expires_in.map(|s| now_unix() + s),
             },
         );
+        self.save();
     }
 
     /// Begin a Device Code authorization: ask the provider for a `user_code`
@@ -309,6 +392,7 @@ impl TokenStore {
 
     pub fn revoke(&self, provider: &str) {
         self.tokens.lock().unwrap().remove(provider);
+        self.save();
     }
 
     /// Return a currently-valid access token, refreshing transparently if it
@@ -330,7 +414,7 @@ impl TokenStore {
 
     fn is_expired(&self, token: &TokenSet) -> bool {
         match token.expires_at {
-            Some(at) => Instant::now() + EXPIRY_SKEW >= at,
+            Some(at) => now_unix() + EXPIRY_SKEW_SECS >= at,
             None => false,
         }
     }
@@ -383,9 +467,9 @@ impl TokenStore {
         if let Some(r) = parsed.refresh_token {
             entry.refresh = Some(r);
         }
-        entry.expires_at = parsed
-            .expires_in
-            .map(|s| Instant::now() + Duration::from_secs(s));
+        entry.expires_at = parsed.expires_in.map(|s| now_unix() + s);
+        drop(tokens);
+        self.save();
         Ok(parsed.access_token)
     }
 }
@@ -504,6 +588,54 @@ mod tests {
         }
         assert!(!store.device_pending("twitch"), "the flow must not stay pending");
         assert!(!store.is_authorized("twitch"));
+    }
+
+    /// A connected account must survive a restart: reload the file into a fresh
+    /// store and the token (and the env needed to refresh it) are still there.
+    #[test]
+    fn tokens_survive_a_restart() {
+        let dir = std::env::temp_dir().join(format!("qt-oauth-{}", now_unix()));
+        let path = dir.join("oauth.json");
+        let _ = std::fs::remove_dir_all(&dir);
+
+        {
+            let store = TokenStore::new();
+            store.set_path(path.clone());
+            store.set_provider("twitch", "https://id.twitch.tv/oauth2/token", "client-123", None);
+            store.seed("twitch", "user-token", Some("refresh-1"), Some(3600));
+            assert!(store.is_authorized("twitch"));
+        }
+
+        let reloaded = TokenStore::new();
+        assert!(!reloaded.is_authorized("twitch"), "nothing before the file is attached");
+        reloaded.set_path(path.clone());
+        assert!(reloaded.is_authorized("twitch"), "the token came back");
+        assert_eq!(reloaded.access_token("twitch").unwrap(), "user-token");
+
+        // Disconnecting must clear the file too, not just memory.
+        reloaded.revoke("twitch");
+        let after = TokenStore::new();
+        after.set_path(path);
+        assert!(!after.is_authorized("twitch"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// An access token that is already dead and has no refresh token is not
+    /// worth reloading — it could only produce a confusing "connected" state.
+    #[test]
+    fn a_dead_unrefreshable_token_is_not_reloaded() {
+        let dir = std::env::temp_dir().join(format!("qt-oauth-dead-{}", now_unix()));
+        let path = dir.join("oauth.json");
+        let _ = std::fs::remove_dir_all(&dir);
+        {
+            let store = TokenStore::new();
+            store.set_path(path.clone());
+            store.seed("twitch", "stale", None, Some(0));
+        }
+        let reloaded = TokenStore::new();
+        reloaded.set_path(path);
+        assert!(!reloaded.is_authorized("twitch"));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

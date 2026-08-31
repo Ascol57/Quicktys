@@ -364,9 +364,14 @@ formulaire d'enregistrement réclame une URL de redirection, mais **le flux
 appareil ne s'en sert jamais** — `http://localhost` suffit — et aucun client
 secret n'est requis.
 
-⚠️ Reste à faire : le token-store est **en mémoire** — une reconnexion est
-nécessaire à chaque démarrage. Le persister (chiffré, via le trousseau de l'OS)
-est le prochain pas de cette facilitation.
+**Persistance des jetons (fait).** Le token-store écrit dans
+`<data>/oauth.json` (`0600` sous unix) : jeux de jetons **et** envs de
+fournisseur, ces derniers étant indispensables au refresh après redémarrage. Un
+jeton mort et non rafraîchissable n'est pas rechargé, pour ne pas afficher un
+« connecté » mensonger. L'expiration est stockée en **secondes unix absolues** :
+un `Instant` est monotone, donc dénué de sens précisément au moment où on le
+relit. ⚠️ Reste du JSON en clair — protégé des autres utilisateurs de la machine,
+pas de ce qui tourne sous ton compte. Le trousseau de l'OS est le pas suivant.
 
 > Ce patron (« le core facilite, le module possède l'env et l'usage ») est le
 > modèle à suivre pour d'autres tâches transverses futures.

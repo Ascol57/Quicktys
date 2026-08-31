@@ -1055,6 +1055,12 @@ impl WasmHost {
         self.world.registry.clone()
     }
 
+    /// Persist connected accounts to `path`, loading whatever is already there.
+    /// Without it every restart forgets the authorization.
+    pub fn set_oauth_store(&self, path: std::path::PathBuf) {
+        self.world.tokens.set_path(path);
+    }
+
     /// Begin an OAuth **Device Code** authorization for `provider`, returning the
     /// code to show the user and where to enter it.
     ///

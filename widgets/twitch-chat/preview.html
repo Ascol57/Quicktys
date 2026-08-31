@@ -1,0 +1,188 @@
+<!doctype html>
+<!-- Twitch chat PREVIEW: used only by the in-app editor (WidgetFrame loads it in
+     place of index.html when previewing). Same settings bridge, but it invents
+     messages so you can design the look without a live channel — and, unlike the
+     real widget, it never asks the plugin to join anything. -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: transparent; }
+      body {
+        font-family: var(--font);
+        overflow: hidden;
+        --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        --weight: 400;
+        --scale: 1;
+        --text: #efefef; --bg: #18181b; --accent: #9146ff; --radius: 10px;
+      }
+      .wrap {
+        height: 100%; width: 100%;
+        display: flex; flex-direction: column;
+        border-radius: var(--radius); overflow: hidden; padding: 0.35rem;
+      }
+      body.bg .wrap { background: var(--bg); }
+      .list {
+        flex: 1; min-height: 0;
+        display: flex; flex-direction: column; justify-content: flex-end;
+        gap: 0.2rem; overflow: hidden;
+      }
+      body.top .list { justify-content: flex-start; }
+      .msg {
+        color: var(--text);
+        font-weight: var(--weight);
+        font-size: calc(0.95rem * var(--scale));
+        line-height: 1.35;
+        padding: 0.18rem 0.3rem;
+        overflow-wrap: anywhere;
+      }
+      body.animate .msg { animation: slide 0.22s ease-out; }
+      @keyframes slide { from { opacity: 0; transform: translateY(6px); } }
+      body.sep .msg + .msg { border-top: 1px solid rgba(255, 255, 255, 0.07); }
+      body.striped .msg:nth-child(even) { background: rgba(255, 255, 255, 0.04); border-radius: 6px; }
+      body.bubble .msg {
+        background: rgba(255, 255, 255, 0.07); border-radius: 12px;
+        padding: 0.3rem 0.55rem; width: fit-content; max-width: 100%;
+      }
+      body.card .msg {
+        background: rgba(0, 0, 0, 0.25); border-left: 3px solid var(--accent);
+        border-radius: 6px; padding: 0.3rem 0.5rem;
+      }
+      body.bubble .msg + .msg, body.card .msg + .msg { border-top: 0; }
+      .time { opacity: 0.4; font-size: 0.8em; margin-right: 0.35em; font-variant-numeric: tabular-nums; }
+      .name { font-weight: 700; }
+      .sep-colon { opacity: 0.5; margin-right: 0.3em; }
+      .badge {
+        display: inline-block; font-size: 0.62em; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.04em;
+        padding: 0.1em 0.35em; margin-right: 0.3em;
+        border-radius: 4px; color: #fff; background: var(--accent);
+      }
+      .badge.mod { background: #00ad03; }
+      .badge.vip { background: #e005b9; }
+      .badge.sub { background: #6441a5; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap"><div class="list" id="list"></div></div>
+
+    <script>
+      let config = {};
+      const on = (key) => config[key] !== false;
+      const $ = (id) => document.getElementById(id);
+
+      const FONTS = {
+        system: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+        sans: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+        rounded: 'ui-rounded, "SF Pro Rounded", "Segoe UI Variable Display", Nunito, system-ui, sans-serif',
+        condensed: '"Roboto Condensed", "Arial Narrow", "Segoe UI", sans-serif',
+        mono: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
+        serif: 'ui-serif, Georgia, "Times New Roman", serif',
+      };
+      const AUTO = ["#ff4a80", "#00c8a0", "#4aa8ff", "#ffb02e", "#c77dff",
+                    "#5ce65c", "#ff7043", "#26c6da", "#ec407a", "#9ccc65"];
+
+      // A believable sample: a host, a mod, a sub and plain viewers.
+      const SAMPLE = [
+        { displayName: "Ascol57", color: "#9146ff", badges: ["broadcaster"], text: "on lance le stream dans 2 min" },
+        { displayName: "modo_kev", color: "#00c8a0", badges: ["moderator"], text: "bienvenue à tous o/" },
+        { displayName: "viewer_42", color: "", badges: [], text: "enfin !! j'attendais ça" },
+        { displayName: "Nina", color: "#ff4a80", badges: ["subscriber"], text: "le nouvel overlay est très propre" },
+        { displayName: "bob", color: "", badges: [], text: "quelqu'un sait quelle musique c'est ?" },
+        { displayName: "Ascol57", color: "#9146ff", badges: ["broadcaster"], text: "c'est dans le widget Now Playing 😉" },
+        { displayName: "lea_streams", color: "#4aa8ff", badges: ["vip"], text: "bon stream !" },
+      ];
+      let shown = [];
+      let next = 0;
+
+      function applyConfig() {
+        const s = document.body.style;
+        const set = (k, v) => v !== undefined && s.setProperty(k, v);
+        set("--text", config.textColor);
+        set("--bg", config.bgColor);
+        set("--accent", config.accentColor);
+        set("--font", FONTS[config.fontFamily]);
+        set("--weight", config.fontWeight);
+        if (config.fontScale !== undefined) {
+          s.setProperty("--scale", String(Number(config.fontScale) / 100 || 1));
+        }
+        if (config.radius !== undefined) s.setProperty("--radius", config.radius + "px");
+        const b = document.body.classList;
+        b.toggle("bg", on("showBackground"));
+        b.toggle("sep", on("showSeparators") && (config.rowStyle ?? "plain") === "plain");
+        b.toggle("animate", on("animate"));
+        b.toggle("top", config.newestAt === "top");
+        for (const style of ["striped", "bubble", "card"]) b.toggle(style, config.rowStyle === style);
+      }
+
+      function autoColor(name) {
+        let hash = 0;
+        for (const ch of String(name)) hash = (hash * 31 + ch.codePointAt(0)) >>> 0;
+        return AUTO[hash % AUTO.length];
+      }
+      function nameColor(m) {
+        const mode = config.nameColors ?? "twitch";
+        if (mode === "fixed") return config.fixedNameColor || "#9146ff";
+        if (mode === "auto") return autoColor(m.displayName);
+        return m.color || autoColor(m.displayName);
+      }
+      const esc = (s) =>
+        String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+      // The preview has no Helix map, so it always shows the text pills — the
+      // real widget swaps in Twitch's images once an account is connected.
+      const BADGE_CLASS = { moderator: "mod", vip: "vip", subscriber: "sub" };
+      function badges(m) {
+        if (!on("showBadges")) return "";
+        return (m.badges ?? [])
+          .map((b) => {
+            const label = b === "broadcaster" ? "host" : b === "moderator" ? "mod" : b === "subscriber" ? "sub" : b;
+            return `<span class="badge ${BADGE_CLASS[b] ?? ""}">${esc(label)}</span>`;
+          })
+          .join("");
+      }
+
+      function render() {
+        const max = Math.max(1, Number(config.maxMessages) || 30);
+        let list = shown.slice(-max);
+        if (config.newestAt === "top") list = list.slice().reverse();
+        $("list").innerHTML = list
+          .map((m) => {
+            const time = on("showTimestamps")
+              ? `<span class="time">${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>`
+              : "";
+            return (
+              `<div class="msg">${time}${badges(m)}` +
+              `<span class="name" style="color:${esc(nameColor(m))}">${esc(m.displayName)}</span>` +
+              `<span class="sep-colon">:</span>${esc(m.text)}</div>`
+            );
+          })
+          .join("");
+      }
+
+      function tick() {
+        shown.push(SAMPLE[next % SAMPLE.length]);
+        next += 1;
+        if (shown.length > 40) shown = shown.slice(-40);
+        render();
+      }
+
+      window.addEventListener("message", (e) => {
+        const d = e.data;
+        if (!d || d.source !== "quicktys") return;
+        if (d.type === "config") {
+          config = d.config || {};
+          applyConfig();
+          render();
+        }
+      });
+
+      applyConfig();
+      // Seed a few so the preview is never empty, then trickle.
+      for (let i = 0; i < 4; i += 1) tick();
+      setInterval(tick, 2200);
+      parent.postMessage({ source: "quicktys-widget", type: "ready" }, "*");
+    </script>
+  </body>
+</html>

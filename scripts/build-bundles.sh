@@ -57,6 +57,7 @@ WIDGETS=(
   "widget:widgets/pear-music:pear-music"
   "widget:widgets/alert:alert"
   "widget:widgets/countdown:countdown"
+  "widget:widgets/twitch-chat:twitch-chat"
 )
 
 bundle_one() {

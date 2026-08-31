@@ -1,0 +1,58 @@
+{
+  "name": "Chat Twitch",
+  "description": "Le chat Twitch en direct avec badges, emotes et couleurs par utilisateur. Lecture anonyme — aucun compte requis.",
+  "config": {
+    "channel": "Chaîne",
+    "maxMessages": "Messages affichés",
+    "newestAt": "Message le plus récent",
+    "rowStyle": "Style des lignes",
+    "fadeAfter": "Disparition après (s, 0 = jamais)",
+    "fontFamily": "Police",
+    "fontWeight": "Graisse",
+    "fontScale": "Taille du texte (%)",
+    "nameColors": "Couleur des pseudos",
+    "fixedNameColor": "Couleur du pseudo",
+    "textColor": "Texte",
+    "bgColor": "Fond",
+    "accentColor": "Accent",
+    "radius": "Arrondi des coins",
+    "showBadges": "Afficher les badges",
+    "showEmotes": "Afficher les emotes",
+    "showTimestamps": "Afficher l'heure",
+    "showSeparators": "Afficher les séparateurs",
+    "showBackground": "Afficher le fond",
+    "animate": "Animer les nouveaux messages"
+  },
+  "options": {
+    "newestAt": {
+      "bottom": "En bas",
+      "top": "En haut"
+    },
+    "rowStyle": {
+      "plain": "Simple",
+      "striped": "Rayé",
+      "bubble": "Bulles",
+      "card": "Cartes"
+    },
+    "nameColors": {
+      "twitch": "La couleur Twitch du viewer",
+      "auto": "Automatique par viewer",
+      "fixed": "Une couleur fixe"
+    },
+    "fontFamily": {
+      "system": "Système",
+      "sans": "Sans empattement",
+      "rounded": "Arrondie",
+      "condensed": "Condensée",
+      "mono": "Chasse fixe",
+      "serif": "À empattement"
+    },
+    "fontWeight": {
+      "300": "Fine",
+      "400": "Normale",
+      "500": "Moyenne",
+      "600": "Demi-grasse",
+      "700": "Grasse"
+    }
+  }
+}

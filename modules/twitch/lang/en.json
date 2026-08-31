@@ -28,6 +28,32 @@
     },
     "auth-status": {
       "name": "Authentication status"
+    },
+    "connect-chat": {
+      "name": "Connect to chat"
+    },
+    "connect-events": {
+      "name": "Connect to EventSub"
+    },
+    "set-eventsub-url": {
+      "name": "Set EventSub address"
+    },
+    "chat-badges": {
+      "name": "Chat badge images"
+    }
+  },
+  "events": {
+    "chat": {
+      "name": "Chat message"
+    },
+    "follow": {
+      "name": "Follow"
+    },
+    "subscribe": {
+      "name": "Subscription"
+    },
+    "raid": {
+      "name": "Raid"
     }
   }
 }

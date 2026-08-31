@@ -1,0 +1,41 @@
+{
+  "id": "twitch-chat",
+  "kind": "widget",
+  "name": "Twitch chat",
+  "icon": "pi pi-comments",
+  "runtime": "html",
+  "entry": "index.html",
+  "preview": "preview.html",
+  "requires": ["twitch"],
+  "defaultW": 2,
+  "defaultH": 3,
+  "config": {
+    "type": "Object",
+    "properties": {
+      "channel": { "type": "String", "default": "" },
+      "maxMessages": { "type": "Number", "default": 30, "min": 3, "max": 100 },
+      "newestAt": { "type": "String", "enum": ["bottom", "top"], "default": "bottom" },
+      "rowStyle": { "type": "String", "enum": ["plain", "striped", "bubble", "card"], "default": "plain" },
+      "fadeAfter": { "type": "Number", "default": 0, "min": 0, "max": 600 },
+      "fontFamily": {
+        "type": "String",
+        "enum": ["system", "sans", "rounded", "condensed", "mono", "serif"],
+        "default": "system"
+      },
+      "fontWeight": { "type": "String", "enum": ["300", "400", "500", "600", "700"], "default": "400" },
+      "fontScale": { "type": "Number", "default": 100, "min": 60, "max": 220 },
+      "nameColors": { "type": "String", "enum": ["twitch", "auto", "fixed"], "default": "twitch" },
+      "fixedNameColor": { "type": "Color", "default": "#9146ff" },
+      "textColor": { "type": "Color", "default": "#efefef" },
+      "bgColor": { "type": "Color", "default": "#18181b" },
+      "accentColor": { "type": "Color", "default": "#9146ff" },
+      "radius": { "type": "Number", "default": 10, "min": 0, "max": 40 },
+      "showBadges": { "type": "Boolean", "default": true },
+      "showEmotes": { "type": "Boolean", "default": true },
+      "showTimestamps": { "type": "Boolean", "default": true },
+      "showSeparators": { "type": "Boolean", "default": true },
+      "showBackground": { "type": "Boolean", "default": true },
+      "animate": { "type": "Boolean", "default": true }
+    }
+  }
+}

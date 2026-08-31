@@ -236,8 +236,12 @@ macro_rules! define_module {
             }
 
             fn on_host_event(event_id: ::std::string::String, payload_json: ::std::string::String) {
-                let payload =
-                    $crate::serde_json::from_str(&payload_json).unwrap_or($crate::Value::Null);
+                // Host events carry whatever the transport produced. A JSON
+                // socket (obs-websocket, the Pear player) parses; a TEXT protocol
+                // (Twitch IRC) does not — hand those through as a string rather
+                // than silently losing the line to `null`.
+                let payload = $crate::serde_json::from_str(&payload_json)
+                    .unwrap_or_else(|_| $crate::Value::String(payload_json));
                 <$module as $crate::Module>::on_host_event(&event_id, payload);
             }
         }

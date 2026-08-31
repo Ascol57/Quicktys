@@ -1,0 +1,58 @@
+{
+  "name": "Twitch chat",
+  "description": "Live Twitch chat with badges, emotes and per-user colours. Reads anonymously — no account needed.",
+  "config": {
+    "channel": "Channel",
+    "maxMessages": "Messages shown",
+    "newestAt": "Newest message",
+    "rowStyle": "Row style",
+    "fadeAfter": "Fade out after (s, 0 = never)",
+    "fontFamily": "Font",
+    "fontWeight": "Font weight",
+    "fontScale": "Text size (%)",
+    "nameColors": "Name colours",
+    "fixedNameColor": "Name colour",
+    "textColor": "Text",
+    "bgColor": "Background",
+    "accentColor": "Accent",
+    "radius": "Corner radius",
+    "showBadges": "Show badges",
+    "showEmotes": "Show emotes",
+    "showTimestamps": "Show timestamps",
+    "showSeparators": "Show separators",
+    "showBackground": "Show background",
+    "animate": "Animate new messages"
+  },
+  "options": {
+    "newestAt": {
+      "bottom": "At the bottom",
+      "top": "At the top"
+    },
+    "rowStyle": {
+      "plain": "Plain",
+      "striped": "Striped",
+      "bubble": "Bubbles",
+      "card": "Cards"
+    },
+    "nameColors": {
+      "twitch": "The viewer's Twitch colour",
+      "auto": "Automatic per viewer",
+      "fixed": "One fixed colour"
+    },
+    "fontFamily": {
+      "system": "System",
+      "sans": "Sans-serif",
+      "rounded": "Rounded",
+      "condensed": "Condensed",
+      "mono": "Monospace",
+      "serif": "Serif"
+    },
+    "fontWeight": {
+      "300": "Light",
+      "400": "Regular",
+      "500": "Medium",
+      "600": "Semibold",
+      "700": "Bold"
+    }
+  }
+}

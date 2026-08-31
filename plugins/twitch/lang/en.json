@@ -4,17 +4,64 @@
   "actions": {
     "chat": {
       "name": "Send chat message",
-      "config": { "message": { "label": "Message" } }
+      "config": {
+        "message": {
+          "label": "Message"
+        }
+      }
     },
     "announce": {
       "name": "Announce",
       "config": {
-        "message": { "label": "Message" },
-        "color": { "label": "Color" }
+        "message": {
+          "label": "Message"
+        },
+        "color": {
+          "label": "Color"
+        }
+      }
+    },
+    "watch-chat": {
+      "name": "Watch a channel's chat",
+      "config": {
+        "channel": "Channel"
+      }
+    },
+    "watch-events": {
+      "name": "Watch follows / subs / raids",
+      "config": {
+        "channel": "Channel"
       }
     }
   },
-  "triggers": {},
-  "state": {},
+  "triggers": {
+    "chat-message": {
+      "name": "Chat message",
+      "description": "Fires on every message in the watched channel."
+    },
+    "follow": {
+      "name": "New follower",
+      "description": "Requires a connected account (EventSub)."
+    },
+    "subscribe": {
+      "name": "New subscriber",
+      "description": "Requires a connected account (EventSub)."
+    },
+    "raid": {
+      "name": "Raid received",
+      "description": "Requires a connected account (EventSub)."
+    }
+  },
+  "state": {
+    "chat": {
+      "name": "Recent chat"
+    },
+    "chat-channel": {
+      "name": "Watched channel"
+    },
+    "badges": {
+      "name": "Badge images"
+    }
+  },
   "settings": {}
 }

@@ -10,12 +10,13 @@
 //! `set-base-url` overrides the API root so tests point it at a stand-in server
 //! (never the live api.twitch.tv).
 //!
-//! Not covered here: **EventSub** (live chat/follow/sub *triggers*) needs the
-//! host's streaming `ws-connect → on-host-event` path, which is not wired yet —
-//! this module is the request/response half (actions), documented as such.
+//! **Chat** is read live over Twitch IRC (`wss://irc-ws.chat.twitch.tv`) and
+//! republished as `chat` events — anonymously, so a chat display works with no
+//! account connected. Still not covered: **EventSub** (follow/sub/raid
+//! triggers), which needs subscription management on top of the same socket.
 
 use quicktys_module_sdk::{
-    Capability, Module, ModuleManifest, Schema, ServiceDecl, Value,
+    Capability, EventDecl, Module, ModuleManifest, Schema, ServiceDecl, Value,
 };
 
 wit_bindgen::generate!({
@@ -23,7 +24,9 @@ wit_bindgen::generate!({
     world: "module",
 });
 
-use quicktys::api::net::{fetch, HttpRequest};
+use quicktys::api::events::emit_event;
+use quicktys::api::logging::{log, Level};
+use quicktys::api::net::{fetch, send, ws_connect, HttpRequest};
 use quicktys::api::oauth::access_token;
 use quicktys::api::storage::{kv_get, kv_set};
 
@@ -44,7 +47,294 @@ const TOKEN_URL: &str = "https://id.twitch.tv/oauth2/token";
 /// What the actions in this module actually need. Space-delimited, as Twitch
 /// wants. Keep in step with the services below — asking for more than we use is
 /// a consent smell.
-const SCOPES: &str = "user:read:chat user:write:chat user:bot channel:bot moderator:manage:announcements channel:read:subscriptions";
+/// `moderator:read:followers` is what `channel.follow` v2 requires; the rest
+/// back the chat/announce actions and `channel.subscribe`. `channel.raid` needs
+/// no scope. Adding a scope invalidates existing tokens — reconnect after.
+const SCOPES: &str = "user:read:chat user:write:chat user:bot channel:bot moderator:manage:announcements channel:read:subscriptions moderator:read:followers";
+
+// --- Chat (IRC over WebSocket) ----------------------------------------------
+//
+// Twitch decommissioned the unencrypted WebSocket endpoint, so this needs the
+// host's `wss://` support. We connect **anonymously**: an `justinfan<n>` nick
+// with no PASS gives a read-only feed, which is all a chat *display* needs — so
+// the widget works before any account is connected, and no token ever travels
+// over the wire. Sending is a separate, authenticated path (Helix `send-chat`).
+//
+// `twitch.tv/tags` is what makes a pretty widget possible: it decorates PRIVMSG
+// with the sender's chosen colour, display name, badges and emote positions.
+const CHAT_WS: &str = "wss://irc-ws.chat.twitch.tv:443";
+
+/// The chat socket, overridable so tests point at a stand-in IRC server and
+/// never touch the real Twitch (same rule as `set-base-url` for Helix).
+fn chat_url() -> String {
+    kv_get("chat_url")
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| CHAT_WS.to_string())
+}
+/// Host event id for the chat socket (see `on_host_event`).
+const CHAT_EVENT: &str = "chat-irc";
+
+thread_local! {
+    /// Write handle for the chat socket, for PONG replies and JOINs.
+    static CHAT_HANDLE: std::cell::RefCell<Option<u64>> = const { std::cell::RefCell::new(None) };
+}
+
+fn chat_send(line: &str) {
+    CHAT_HANDLE.with(|h| {
+        if let Some(handle) = *h.borrow() {
+            let _ = send(handle, format!("{line}\r\n").as_bytes());
+        }
+    });
+}
+
+/// Split an IRC line's `@k=v;k2=v2` tag block from the rest.
+fn split_tags(line: &str) -> (Vec<(String, String)>, &str) {
+    let Some(rest) = line.strip_prefix('@') else {
+        return (Vec::new(), line);
+    };
+    let (tags, remainder) = match rest.split_once(' ') {
+        Some((t, r)) => (t, r),
+        None => (rest, ""),
+    };
+    let parsed = tags
+        .split(';')
+        .filter_map(|kv| kv.split_once('='))
+        .map(|(k, v)| (k.to_string(), unescape_tag(v)))
+        .collect();
+    (parsed, remainder)
+}
+
+/// IRCv3 tag values escape spaces, semicolons, CR and LF.
+fn unescape_tag(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    let mut chars = value.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('s') => out.push(' '),
+            Some(':') => out.push(';'),
+            Some('r') => out.push('\r'),
+            Some('n') => out.push('\n'),
+            Some(other) => out.push(other),
+            None => {}
+        }
+    }
+    out
+}
+
+/// `emotes` tag → `[{id, start, end}]`, sorted by position. The widget turns
+/// these into CDN images; without them a chat is just grey text.
+fn parse_emotes(tag: &str) -> Vec<Value> {
+    let mut out = Vec::new();
+    for group in tag.split('/').filter(|g| !g.is_empty()) {
+        let Some((id, ranges)) = group.split_once(':') else {
+            continue;
+        };
+        for range in ranges.split(',') {
+            if let Some((a, b)) = range.split_once('-') {
+                if let (Ok(start), Ok(end)) = (a.parse::<usize>(), b.parse::<usize>()) {
+                    out.push(quicktys_module_sdk::json!({
+                        "id": id, "start": start, "end": end
+                    }));
+                }
+            }
+        }
+    }
+    out.sort_by_key(|e| e.get("start").and_then(Value::as_u64).unwrap_or(0));
+    out
+}
+
+/// Turn one IRC line into a `chat` event, answering PINGs on the way.
+fn on_irc_line(line: &str) {
+    let line = line.trim_end_matches(['\r', '\n']);
+    if line.is_empty() {
+        return;
+    }
+    // Keepalive: the server drops us if we don't answer.
+    if let Some(token) = line.strip_prefix("PING") {
+        chat_send(&format!("PONG{token}"));
+        return;
+    }
+    let (tags, rest) = split_tags(line);
+    let tag = |k: &str| {
+        tags.iter()
+            .find(|(name, _)| name == k)
+            .map(|(_, v)| v.clone())
+            .unwrap_or_default()
+    };
+
+    // :nick!user@host PRIVMSG #channel :text
+    let Some((prefix, command)) = rest.strip_prefix(':').and_then(|r| r.split_once(' ')) else {
+        return;
+    };
+    if !command.starts_with("PRIVMSG") {
+        return;
+    }
+    let Some((_, text)) = command.split_once(" :") else {
+        return;
+    };
+    let nick = prefix.split('!').next().unwrap_or_default().to_string();
+    let display = match tag("display-name") {
+        d if d.is_empty() => nick.clone(),
+        d => d,
+    };
+    // Keep `set/version` intact — the version is what indexes the badge image
+    // map from Helix (`subscriber/12` is a different image from `subscriber/1`).
+    let badges: Vec<Value> = tag("badges")
+        .split(',')
+        .filter(|b| !b.is_empty())
+        .map(|b| Value::String(b.to_string()))
+        .collect();
+
+    emit_event(
+        "chat",
+        &quicktys_module_sdk::json!({
+            "id": tag("id"),
+            "user": nick,
+            "displayName": display,
+            // Twitch leaves `color` empty for users who never picked one; the
+            // widget assigns a stable colour from the name in that case.
+            "color": tag("color"),
+            "text": text,
+            "badges": badges,
+            "emotes": parse_emotes(&tag("emotes")),
+            "channel": stored("chat_channel").unwrap_or_default(),
+        })
+        .to_string(),
+    );
+}
+
+// --- EventSub (follow / sub / raid) -----------------------------------------
+//
+// Chat comes over IRC; everything else comes over EventSub. The shape: open the
+// socket, wait for `session_welcome`, then create the subscriptions over Helix
+// with `transport: {method:"websocket", session_id}` — **within 10 seconds**, or
+// Twitch closes the connection with code 4003. Notifications then arrive on the
+// same socket. Unlike chat this needs a *user* token (app tokens are refused),
+// so it only works once an account is connected.
+const EVENTSUB_WS: &str = "wss://eventsub.wss.twitch.tv/ws";
+const EVENTSUB_EVENT: &str = "eventsub";
+
+/// Overridable so tests point at a stand-in server (never the real Twitch).
+fn eventsub_url() -> String {
+    kv_get("eventsub_url")
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| EVENTSUB_WS.to_string())
+}
+
+/// The subscriptions we create, with the exact versions and conditions Twitch
+/// documents. `channel.follow` is v2 — v1 is deprecated and rejected.
+fn subscription_specs(broadcaster: &str, moderator: &str) -> Vec<(&'static str, &'static str, Value)> {
+    vec![
+        (
+            "channel.follow",
+            "2",
+            quicktys_module_sdk::json!({
+                "broadcaster_user_id": broadcaster,
+                "moderator_user_id": moderator,
+            }),
+        ),
+        (
+            "channel.subscribe",
+            "1",
+            quicktys_module_sdk::json!({ "broadcaster_user_id": broadcaster }),
+        ),
+        (
+            // Raids INTO this channel. `from_`/`to_` are mutually exclusive.
+            "channel.raid",
+            "1",
+            quicktys_module_sdk::json!({ "to_broadcaster_user_id": broadcaster }),
+        ),
+    ]
+}
+
+/// Twitch subscription type → the module event we publish.
+fn event_name(subscription_type: &str) -> Option<&'static str> {
+    match subscription_type {
+        "channel.follow" => Some("follow"),
+        "channel.subscribe" => Some("subscribe"),
+        "channel.raid" => Some("raid"),
+        _ => None,
+    }
+}
+
+/// Create every subscription against the freshly-welcomed session.
+fn create_subscriptions(session_id: &str) {
+    let (Some(broadcaster), Some(moderator)) =
+        (stored("broadcaster_id"), stored("moderator_id"))
+    else {
+        log(Level::Warn, "twitch eventsub: no broadcaster id, skipping");
+        return;
+    };
+    for (kind, version, condition) in subscription_specs(&broadcaster, &moderator) {
+        let body = quicktys_module_sdk::json!({
+            "type": kind,
+            "version": version,
+            "condition": condition,
+            "transport": { "method": "websocket", "session_id": session_id },
+        });
+        match helix_ok("POST", "/eventsub/subscriptions", &[], Some(body)) {
+            Ok(_) => log(Level::Info, &format!("twitch eventsub: subscribed to {kind}")),
+            Err(e) => log(Level::Warn, &format!("twitch eventsub: {kind} failed: {e}")),
+        }
+    }
+}
+
+/// Handle one EventSub frame.
+fn on_eventsub(message: &Value) {
+    let meta_type = message
+        .get("metadata")
+        .and_then(|m| m.get("message_type"))
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let payload = message.get("payload");
+
+    match meta_type {
+        // The 10-second clock starts here.
+        "session_welcome" => {
+            if let Some(id) = payload
+                .and_then(|p| p.get("session"))
+                .and_then(|s| s.get("id"))
+                .and_then(Value::as_str)
+            {
+                create_subscriptions(id);
+            }
+        }
+        "notification" => {
+            let kind = payload
+                .and_then(|p| p.get("subscription"))
+                .and_then(|s| s.get("type"))
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let Some(name) = event_name(kind) else { return };
+            let event = payload.and_then(|p| p.get("event")).cloned().unwrap_or(Value::Null);
+            emit_event(name, &event.to_string());
+        }
+        // Twitch is migrating us: reconnect, then it closes the old socket.
+        "session_reconnect" => {
+            if let Some(url) = payload
+                .and_then(|p| p.get("session"))
+                .and_then(|s| s.get("reconnect_url"))
+                .and_then(Value::as_str)
+            {
+                log(Level::Info, "twitch eventsub: reconnecting");
+                if let Ok(handle) = ws_connect(url, EVENTSUB_EVENT) {
+                    EVENTSUB_HANDLE.with(|h| *h.borrow_mut() = Some(handle));
+                }
+            }
+        }
+        "revocation" => log(Level::Warn, "twitch eventsub: a subscription was revoked"),
+        _ => {} // session_keepalive and anything new
+    }
+}
+
+thread_local! {
+    /// Handle of the EventSub socket (kept so a reconnect can replace it).
+    static EVENTSUB_HANDLE: std::cell::RefCell<Option<u64>> = const { std::cell::RefCell::new(None) };
+}
 
 /// The access token to authenticate Helix with: the OAuth store first (a
 /// connected account, refreshed transparently by the core), falling back to a
@@ -176,6 +466,52 @@ impl Module for Twitch {
             )
             // Whether we can authenticate, and how (for the Settings page).
             .service(ServiceDecl::new("auth-status"))
+            // Join a channel's chat (read-only, anonymous) and stream it as
+            // `chat` events. Idempotent: re-joining just switches channel.
+            .service(
+                ServiceDecl::new("connect-chat")
+                    .args(Schema::object([("channel".to_string(), Schema::string())])),
+            )
+            // Open the EventSub socket and subscribe to follow/sub/raid.
+            .service(
+                ServiceDecl::new("connect-events")
+                    .args(Schema::object([("channel".to_string(), Schema::string())])),
+            )
+            .service(
+                ServiceDecl::new("set-eventsub-url")
+                    .args(Schema::object([("url".to_string(), Schema::string())])),
+            )
+            .event(EventDecl::new("follow").payload(Schema::object([
+                ("user_name".to_string(), Schema::string()),
+                ("user_login".to_string(), Schema::string()),
+            ])))
+            .event(EventDecl::new("subscribe").payload(Schema::object([
+                ("user_name".to_string(), Schema::string()),
+                ("tier".to_string(), Schema::string()),
+                ("is_gift".to_string(), Schema::boolean()),
+            ])))
+            .event(EventDecl::new("raid").payload(Schema::object([
+                ("from_broadcaster_user_name".to_string(), Schema::string()),
+                ("viewers".to_string(), Schema::number()),
+            ])))
+            // Badge images for the chat widget: `set/version` → CDN URL.
+            .service(
+                ServiceDecl::new("chat-badges")
+                    .args(Schema::object([("channel".to_string(), Schema::string())])),
+            )
+            // Test/self-host override of the chat socket.
+            .service(
+                ServiceDecl::new("set-chat-url")
+                    .args(Schema::object([("url".to_string(), Schema::string())])),
+            )
+            .event(
+                EventDecl::new("chat").payload(Schema::object([
+                    ("user".to_string(), Schema::string()),
+                    ("displayName".to_string(), Schema::string()),
+                    ("text".to_string(), Schema::string()),
+                    ("color".to_string(), Schema::string()),
+                ])),
+            )
             // Test/self-host override of the API root.
             .service(
                 ServiceDecl::new("set-base-url")
@@ -221,6 +557,122 @@ impl Module for Twitch {
             "set-client-id" => {
                 let id = s("client_id").ok_or("set-client-id: `client_id` is required")?;
                 kv_set("client_id", id.trim());
+                Ok(Value::Null)
+            }
+            "connect-chat" => {
+                let channel = s("channel")
+                    .map(|c| c.trim().trim_start_matches('#').to_lowercase())
+                    .filter(|c| !c.is_empty())
+                    .ok_or("connect-chat: `channel` is required")?;
+                kv_set("chat_channel", &channel);
+
+                let handle = ws_connect(&chat_url(), CHAT_EVENT)
+                    .map_err(|e| format!("twitch chat: connect failed: {e:?}"))?;
+                CHAT_HANDLE.with(|h| *h.borrow_mut() = Some(handle));
+
+                // Tags carry the colour, display name, badges and emotes; the
+                // commands cap is a prerequisite for tags.
+                chat_send("CAP REQ :twitch.tv/tags twitch.tv/commands");
+                // Anonymous read-only login. The suffix only has to be unique
+                // per connection.
+                let nonce = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.subsec_nanos())
+                    .unwrap_or(1);
+                chat_send(&format!("NICK justinfan{}", 10_000 + nonce % 80_000));
+                chat_send(&format!("JOIN #{channel}"));
+                Ok(quicktys_module_sdk::json!({ "channel": channel }))
+            }
+            // Global + channel badge images, flattened to `set/version` → URL.
+            // Needs a token (any Helix call does), so this is only available once
+            // an account is connected; the widget falls back to text pills.
+            "chat-badges" => {
+                let channel = s("channel")
+                    .map(|c| c.trim().trim_start_matches('#').to_lowercase())
+                    .filter(|c| !c.is_empty())
+                    .ok_or("chat-badges: `channel` is required")?;
+
+                let mut map = quicktys_module_sdk::serde_json::Map::new();
+                let mut absorb = |sets: &Value| {
+                    for set in sets.get("data").and_then(Value::as_array).into_iter().flatten() {
+                        let set_id = set.get("set_id").and_then(Value::as_str).unwrap_or_default();
+                        for version in set.get("versions").and_then(Value::as_array).into_iter().flatten() {
+                            let id = version.get("id").and_then(Value::as_str).unwrap_or_default();
+                            let url = version
+                                .get("image_url_2x")
+                                .or_else(|| version.get("image_url_1x"))
+                                .and_then(Value::as_str)
+                                .unwrap_or_default();
+                            if !set_id.is_empty() && !id.is_empty() && !url.is_empty() {
+                                map.insert(format!("{set_id}/{id}"), Value::String(url.to_string()));
+                            }
+                        }
+                    }
+                };
+
+                absorb(&helix_ok("GET", "/chat/badges/global", &[], None)?);
+                // Channel badges (custom sub badges) need the broadcaster's id.
+                let users = helix_ok(
+                    "GET",
+                    "/users",
+                    &[("login".to_string(), channel.clone())],
+                    None,
+                )?;
+                if let Some(id) = users
+                    .get("data")
+                    .and_then(Value::as_array)
+                    .and_then(|d| d.first())
+                    .and_then(|u| u.get("id"))
+                    .and_then(Value::as_str)
+                {
+                    absorb(&helix_ok(
+                        "GET",
+                        "/chat/badges",
+                        &[("broadcaster_id".to_string(), id.to_string())],
+                        None,
+                    )?);
+                }
+                Ok(Value::Object(map))
+            }
+            // Resolve the ids EventSub conditions need, then open the socket.
+            // `moderator_user_id` for channel.follow must be the *authenticated*
+            // user — Helix `/users` with no login returns exactly that.
+            "connect-events" => {
+                let channel = s("channel")
+                    .map(|c| c.trim().trim_start_matches('#').to_lowercase())
+                    .filter(|c| !c.is_empty())
+                    .ok_or("connect-events: `channel` is required")?;
+
+                let id_of = |query: &[(String, String)]| -> Result<String, String> {
+                    helix_ok("GET", "/users", query, None)?
+                        .get("data")
+                        .and_then(Value::as_array)
+                        .and_then(|d| d.first())
+                        .and_then(|u| u.get("id"))
+                        .and_then(Value::as_str)
+                        .map(str::to_string)
+                        .ok_or_else(|| "twitch: no such user".to_string())
+                };
+                let broadcaster = id_of(&[("login".to_string(), channel.clone())])?;
+                let me = id_of(&[])?;
+                kv_set("broadcaster_id", &broadcaster);
+                kv_set("moderator_id", &me);
+
+                let handle = ws_connect(&eventsub_url(), EVENTSUB_EVENT)
+                    .map_err(|e| format!("twitch eventsub: connect failed: {e:?}"))?;
+                EVENTSUB_HANDLE.with(|h| *h.borrow_mut() = Some(handle));
+                Ok(quicktys_module_sdk::json!({
+                    "channel": channel, "broadcasterId": broadcaster
+                }))
+            }
+            "set-eventsub-url" => {
+                let url = s("url").ok_or("set-eventsub-url: `url` is required")?;
+                kv_set("eventsub_url", url.trim_end_matches('/'));
+                Ok(Value::Null)
+            }
+            "set-chat-url" => {
+                let url = s("url").ok_or("set-chat-url: `url` is required")?;
+                kv_set("chat_url", url.trim_end_matches('/'));
                 Ok(Value::Null)
             }
             "auth-status" => Ok(quicktys_module_sdk::json!({
@@ -297,7 +749,22 @@ impl Module for Twitch {
         Ok(())
     }
 
-    fn on_host_event(_event_id: &str, _payload: Value) {}
+    /// Chat frames arrive as raw IRC text (not JSON), and one frame may carry
+    /// several `\r\n`-separated lines.
+    fn on_host_event(event_id: &str, payload: Value) {
+        // EventSub speaks JSON; chat speaks raw IRC text.
+        if event_id == EVENTSUB_EVENT {
+            on_eventsub(&payload);
+            return;
+        }
+        if event_id != CHAT_EVENT {
+            return;
+        }
+        let Some(text) = payload.as_str() else { return };
+        for line in text.split('\n') {
+            on_irc_line(line);
+        }
+    }
 }
 
 quicktys_module_sdk::define_module!(Twitch);

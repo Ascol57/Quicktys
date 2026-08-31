@@ -1,0 +1,291 @@
+<!doctype html>
+<!-- Twitch chat widget (real). Renders the `twitch.chat` rolling buffer the
+     `twitch` plugin publishes from the module's live IRC feed.
+
+     It also JOINS: on config it posts the plugin's `watch-chat` action for the
+     configured channel, so dropping the widget on a dashboard or an overlay is
+     all the setup there is. The join is idempotent module-side, and we only
+     re-send it when the channel actually changes.
+
+     Everything visual is driven by the widget's settings — see bundle.json. The
+     editor renders `preview.html` instead (a self-demo), so this file stays the
+     real behaviour: empty until real messages arrive. -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: transparent; }
+      body {
+        font-family: var(--font);
+        overflow: hidden;
+        --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        --weight: 400;
+        --scale: 1;
+        --text: #efefef; --bg: #18181b; --accent: #9146ff; --radius: 10px;
+      }
+      .wrap {
+        height: 100%; width: 100%;
+        display: flex; flex-direction: column;
+        border-radius: var(--radius);
+        overflow: hidden;
+        padding: 0.35rem;
+      }
+      body.bg .wrap { background: var(--bg); }
+      /* The list grows from the bottom so the newest message sits at the edge
+         even when there are too few to fill the box. */
+      .list {
+        flex: 1; min-height: 0;
+        display: flex; flex-direction: column; justify-content: flex-end;
+        gap: 0.2rem;
+        overflow: hidden;
+      }
+      body.top .list { justify-content: flex-start; }
+
+      .msg {
+        color: var(--text);
+        font-weight: var(--weight);
+        font-size: calc(0.95rem * var(--scale));
+        line-height: 1.35;
+        padding: 0.18rem 0.3rem;
+        overflow-wrap: anywhere;
+        transition: opacity 0.4s ease;
+      }
+      body.animate .msg { animation: slide 0.22s ease-out; }
+      @keyframes slide { from { opacity: 0; transform: translateY(6px); } }
+      body.sep .msg + .msg { border-top: 1px solid rgba(255, 255, 255, 0.07); }
+      body.striped .msg:nth-child(even) { background: rgba(255, 255, 255, 0.04); border-radius: 6px; }
+      body.bubble .msg {
+        background: rgba(255, 255, 255, 0.07);
+        border-radius: 12px;
+        padding: 0.3rem 0.55rem;
+        width: fit-content; max-width: 100%;
+      }
+      body.card .msg {
+        background: rgba(0, 0, 0, 0.25);
+        border-left: 3px solid var(--accent);
+        border-radius: 6px;
+        padding: 0.3rem 0.5rem;
+      }
+      body.bubble .msg + .msg, body.card .msg + .msg { border-top: 0; }
+      .msg.fading { opacity: 0; }
+
+      .time { opacity: 0.4; font-size: 0.8em; margin-right: 0.35em; font-variant-numeric: tabular-nums; }
+      .name { font-weight: 700; }
+      .sep-colon { opacity: 0.5; margin-right: 0.3em; }
+      .badge {
+        display: inline-block; vertical-align: baseline;
+        font-size: 0.62em; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 0.1em 0.35em; margin-right: 0.3em;
+        border-radius: 4px; color: #fff;
+        background: var(--accent);
+      }
+      .badge.mod { background: #00ad03; }
+      .badge.vip { background: #e005b9; }
+      .badge.sub { background: #6441a5; }
+      .emote { height: 1.5em; vertical-align: middle; margin: 0 0.1em; }
+      .badge-img { height: 1.05em; width: auto; vertical-align: -0.12em; margin-right: 0.28em; }
+      .empty {
+        color: var(--text); opacity: 0.35;
+        font-size: calc(0.85rem * var(--scale));
+        text-align: center; padding: 0.6rem;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        body.animate .msg { animation: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap"><div class="list" id="list"></div></div>
+
+    <script>
+      let state = {};
+      let config = {};
+      let joined = "";        // channel we last asked the plugin to watch
+      let rendered = "";      // last rendered signature, to avoid churn
+
+      const $ = (id) => document.getElementById(id);
+      const on = (key) => config[key] !== false; // unset booleans default to ON
+
+      const FONTS = {
+        system: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+        sans: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+        rounded: 'ui-rounded, "SF Pro Rounded", "Segoe UI Variable Display", Nunito, system-ui, sans-serif',
+        condensed: '"Roboto Condensed", "Arial Narrow", "Segoe UI", sans-serif',
+        mono: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
+        serif: 'ui-serif, Georgia, "Times New Roman", serif',
+      };
+      // Readable, saturated hues for users who never picked a Twitch colour.
+      const AUTO = ["#ff4a80", "#00c8a0", "#4aa8ff", "#ffb02e", "#c77dff",
+                    "#5ce65c", "#ff7043", "#26c6da", "#ec407a", "#9ccc65"];
+
+      function applyConfig() {
+        const s = document.body.style;
+        const set = (k, v) => v !== undefined && s.setProperty(k, v);
+        set("--text", config.textColor);
+        set("--bg", config.bgColor);
+        set("--accent", config.accentColor);
+        set("--font", FONTS[config.fontFamily]);
+        set("--weight", config.fontWeight);
+        if (config.fontScale !== undefined) {
+          s.setProperty("--scale", String(Number(config.fontScale) / 100 || 1));
+        }
+        if (config.radius !== undefined) s.setProperty("--radius", config.radius + "px");
+
+        const b = document.body.classList;
+        b.toggle("bg", on("showBackground"));
+        b.toggle("sep", on("showSeparators") && (config.rowStyle ?? "plain") === "plain");
+        b.toggle("animate", on("animate"));
+        b.toggle("top", config.newestAt === "top");
+        for (const style of ["striped", "bubble", "card"]) {
+          b.toggle(style, config.rowStyle === style);
+        }
+        joinChannel();
+      }
+
+      // Ask the plugin to join. Idempotent module-side; only re-sent on change.
+      function joinChannel() {
+        const channel = String(config.channel || "").trim().replace(/^#/, "");
+        if (!channel || channel === joined) return;
+        joined = channel;
+        parent.postMessage(
+          {
+            source: "quicktys-widget",
+            type: "action",
+            plugin: "twitch",
+            action: "watch-chat",
+            config: { channel },
+          },
+          "*",
+        );
+      }
+
+      /// A stable colour per user, so the same person keeps the same hue.
+      function autoColor(name) {
+        let hash = 0;
+        for (const ch of String(name)) hash = (hash * 31 + ch.codePointAt(0)) >>> 0;
+        return AUTO[hash % AUTO.length];
+      }
+
+      function nameColor(msg) {
+        const mode = config.nameColors ?? "twitch";
+        if (mode === "fixed") return config.fixedNameColor || "#9146ff";
+        if (mode === "auto") return autoColor(msg.displayName || msg.user);
+        return msg.color || autoColor(msg.displayName || msg.user);
+      }
+
+      const esc = (s) =>
+        String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+      /// Substitute Twitch emotes by their positions. Twitch counts in CODE
+      /// POINTS, not UTF-16 units, so split with Array.from — otherwise any
+      /// emoji earlier in the line shifts every emote after it.
+      function renderText(msg) {
+        const text = String(msg.text ?? "");
+        const emotes = on("showEmotes") && Array.isArray(msg.emotes) ? msg.emotes : [];
+        if (!emotes.length) return esc(text);
+        const chars = Array.from(text);
+        let out = "";
+        let cursor = 0;
+        for (const e of emotes) {
+          const start = Number(e.start), end = Number(e.end);
+          if (!Number.isFinite(start) || start < cursor || end < start) continue;
+          out += esc(chars.slice(cursor, start).join(""));
+          const url = `https://static-cdn.jtvnw.net/emoticons/v2/${encodeURIComponent(e.id)}/default/dark/2.0`;
+          const alt = esc(chars.slice(start, end + 1).join(""));
+          out += `<img class="emote" src="${url}" alt="${alt}" title="${alt}" />`;
+          cursor = end + 1;
+        }
+        return out + esc(chars.slice(cursor).join(""));
+      }
+
+      const BADGE_CLASS = { moderator: "mod", vip: "vip", subscriber: "sub", founder: "sub" };
+      const BADGE_LABEL = { broadcaster: "host", moderator: "mod", subscriber: "sub", founder: "sub" };
+
+      /// Badges arrive as `set/version`. The plugin publishes Twitch's official
+      /// images in `twitch.badges` (a Helix call, so only once an account is
+      /// connected) — fall back to a coloured text pill when there is no image,
+      /// which is what an anonymous chat gets.
+      function renderBadges(msg) {
+        if (!on("showBadges") || !Array.isArray(msg.badges)) return "";
+        const images = state["twitch.badges"] ?? {};
+        return msg.badges
+          .map((badge) => {
+            const set = String(badge).split("/")[0];
+            const url = images[badge] ?? images[`${set}/1`];
+            if (url) {
+              return `<img class="badge-img" src="${esc(url)}" alt="${esc(set)}" title="${esc(set)}" />`;
+            }
+            if (!BADGE_CLASS[set] && set !== "broadcaster") return "";
+            return `<span class="badge ${BADGE_CLASS[set] ?? ""}">${esc(BADGE_LABEL[set] ?? set)}</span>`;
+          })
+          .join("");
+      }
+
+      function render() {
+        const all = Array.isArray(state["twitch.chat"]) ? state["twitch.chat"] : [];
+        const max = Math.max(1, Number(config.maxMessages) || 30);
+        let shown = all.slice(-max);
+        if (config.newestAt === "top") shown = shown.slice().reverse();
+
+        // Cheap identity: skip a full re-render when nothing changed.
+        const signature = shown.map((m) => m.id || m.text).join(" ") + "|" + max;
+        if (signature === rendered) return;
+        rendered = signature;
+
+        if (!shown.length) {
+          $("list").innerHTML = `<div class="empty">${esc(emptyText())}</div>`;
+          return;
+        }
+        $("list").innerHTML = shown
+          .map((m) => {
+            const time = on("showTimestamps")
+              ? `<span class="time">${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>`
+              : "";
+            return (
+              `<div class="msg">${time}${renderBadges(m)}` +
+              `<span class="name" style="color:${esc(nameColor(m))}">${esc(m.displayName || m.user)}</span>` +
+              `<span class="sep-colon">:</span>${renderText(m)}</div>`
+            );
+          })
+          .join("");
+        scheduleFade();
+      }
+
+      function emptyText() {
+        const channel = String(config.channel || "").trim();
+        return channel ? `#${channel}` : "…";
+      }
+
+      // Overlay classic: let messages disappear after a while so the overlay
+      // doesn't permanently cover the scene. 0 = keep them.
+      let fadeTimer = null;
+      function scheduleFade() {
+        clearTimeout(fadeTimer);
+        const after = Number(config.fadeAfter) || 0;
+        if (after <= 0) return;
+        fadeTimer = setTimeout(() => {
+          for (const el of document.querySelectorAll(".msg")) el.classList.add("fading");
+        }, after * 1000);
+      }
+
+      window.addEventListener("message", (e) => {
+        const d = e.data;
+        if (!d || d.source !== "quicktys") return;
+        if (d.type === "config") {
+          config = d.config || {};
+          applyConfig();
+          rendered = ""; // settings changed → force a repaint
+        } else if (d.type === "state") {
+          state = d.state || {};
+        }
+        render();
+      });
+
+      applyConfig();
+      render();
+      parent.postMessage({ source: "quicktys-widget", type: "ready" }, "*");
+    </script>
+  </body>
+</html>
