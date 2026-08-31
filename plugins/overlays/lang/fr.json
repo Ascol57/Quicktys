@@ -1,0 +1,30 @@
+{
+  "name": "Overlays",
+  "description": "Les overlays pour browser source : installe-le pour obtenir l'éditeur d'overlays et les pages /overlay/<id>.",
+  "actions": {
+    "create": {
+      "name": "Créer un overlay",
+      "description": "Crée un overlay, ou renomme celui qui existe déjà.",
+      "config": {
+        "id": "Identifiant de l'overlay",
+        "title": "Titre"
+      }
+    },
+    "delete": {
+      "name": "Supprimer un overlay",
+      "config": {
+        "id": "Identifiant de l'overlay"
+      }
+    },
+    "refresh": {
+      "name": "Rafraîchir la liste",
+      "description": "Relit les overlays et republie le compte et les identifiants."
+    }
+  },
+  "triggers": {},
+  "state": {
+    "count": { "name": "Nombre d'overlays" },
+    "ids": { "name": "Identifiants des overlays" }
+  },
+  "settings": {}
+}

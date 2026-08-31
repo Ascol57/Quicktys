@@ -1,0 +1,33 @@
+{
+  "name": "Pear Desktop",
+  "description": "Pilote l'API locale de Pear Desktop (/api/v1), authentification par jeton comprise.",
+  "services": {
+    "play": { "name": "Lecture" },
+    "pause": { "name": "Pause" },
+    "toggle": { "name": "Lecture / Pause" },
+    "next": { "name": "Piste suivante" },
+    "previous": { "name": "Piste précédente" },
+    "like": { "name": "J'aime" },
+    "dislike": { "name": "Je n'aime pas" },
+    "toggle-mute": { "name": "Couper / rétablir le son" },
+    "shuffle": { "name": "Lecture aléatoire" },
+    "set-volume": { "name": "Régler le volume" },
+    "seek-to": { "name": "Aller à" },
+    "set-queue-index": { "name": "Aller à une position de la file" },
+    "current-song": { "name": "Morceau en cours" },
+    "get-volume": { "name": "Lire le volume" },
+    "poll": { "name": "Sonder" },
+    "authorize": {
+      "name": "Autoriser",
+      "description": "Demande un jeton d'accès à Pear Desktop. Le lecteur affiche une fenêtre Autoriser / Refuser la première fois."
+    },
+    "auth-status": { "name": "État de l'autorisation" },
+    "clear-auth": { "name": "Oublier le jeton" },
+    "set-client-id": { "name": "Définir l'identifiant client" },
+    "set-base-url": { "name": "Définir l'adresse de l'API" }
+  },
+  "events": {
+    "song": { "name": "Morceau" },
+    "song-changed": { "name": "Morceau changé" }
+  }
+}

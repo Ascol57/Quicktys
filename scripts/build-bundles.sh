@@ -30,6 +30,9 @@ EXTENSIONS=(
   "module:modules/obs:obs:obs_module.wasm:certified"
   "plugin:plugins/obs:obs:obs_plugin.wasm"
   "module:modules/webview:webview:webview_module.wasm"
+  # The plugin that makes the webview module reachable: modules are never
+  # browsable, so without a plugin requiring it, `webview` never got installed.
+  "plugin:plugins/overlays:overlays:overlays.wasm"
   "module:modules/http:http:http_module.wasm:certified"
   "plugin:plugins/discord:discord:discord_plugin.wasm"
   "module:modules/sound:sound:sound_module.wasm:certified"

@@ -293,6 +293,28 @@ et un même module peut alimenter **plusieurs** plugins.
   reste le contrat de référence.
 - **Comptage de références** : un module que plus aucun plugin n'utilise peut
   être désinstallé.
+- **Corollaire (piège rencontré) : un module que *personne* ne requiert est
+  inatteignable.** Les modules ne sont pas *parcourables* dans la marketplace
+  (`MarketplaceView.vue` ne liste que `plugin` et `widget`) : ils n'arrivent que
+  tirés par un plugin. Le module `webview` échappait à cette règle — ses
+  consommateurs sont le **cœur lui-même** (le webserver sert `/overlay/<id>`) et
+  le **frontend** (l'éditeur d'overlays) — donc aucun plugin ne le déclarait, et
+  il ne s'installait **jamais** par le chemin registry (`QUICKTYS_NO_DEV_BUNDLES=1`,
+  ce que fait `dev.sh`). En mode dev il fonctionnait quand même, le boot scannant
+  `dist/bundles` : le bug était invisible en développement.
+  - **Décision** : un plugin **`overlays`** porte la dépendance
+    (`requires: webview@^0`) et devient la face utilisateur de la fonctionnalité.
+    Installer « Overlays » tire le module ; le désinstaller le retire (rien
+    d'autre n'en dépend), donc éditeur d'overlays et `/overlay/<id>` disparaissent
+    avec lui. C'est assumé — le plugin *est* la fonctionnalité du point de vue de
+    l'utilisateur — et le cœur dégrade proprement en son absence
+    (`callModuleSafe` côté frontend, `match` sur l'erreur côté webserver).
+  - Les deux autres options écartées : rendre tous les modules parcourables
+    (exposerait obs/twitch/pear/http… comme installables à la main, contre
+    l'intention de §4.4), ou introduire une notion de « module requis par le
+    cœur » installé automatiquement au boot. Cette seconde piste reste la vraie
+    réponse si d'autres modules deviennent un jour consommés directement par le
+    cœur.
 
 ### 4.5 Certification
 

@@ -91,6 +91,21 @@ videoId,selected}]`, with a fallback across endpoints + console logging). Verify
 against the pear-desktop repo, don't guess. `list_plugins`/`list_modules`/`list_widgets` feed
 the dashboard counts + widget catalogue.
 
+**A module nobody `requires` is unreachable — `overlays` + `webview`.** The
+marketplace browses **plugins and widgets only** (`MarketplaceView.vue`); modules
+arrive solely as a plugin's declared dependency. `modules/webview` (overlay
+storage, ships the editor view) is consumed by the **core** — `webserver.rs`
+serves `/overlay/<id>` from it, `App.vue`/`DashboardView.vue` call it — so no
+plugin required it and it **never installed** via the registry path (`dev.sh` sets
+`QUICKTYS_NO_DEV_BUNDLES=1`); dev mode hid the bug because boot scans
+`dist/bundles`. Fixed by `plugins/overlays`, which declares `requires: webview@^0`
+and is the user-facing face of the feature (state `overlays.count`/`ids`, actions
+`create`/`delete`/`refresh` over the module's services). Consequence: uninstalling
+the plugin drops the module too — the core must keep degrading gracefully without
+it. Rule of thumb: **any new module needs a plugin that requires it**, or it
+cannot be installed. (ARCHITECTURE §4.4 records the decision and the two rejected
+alternatives.)
+
 **`countdown` (plugin + widget) — the "who ticks?" pattern.** `plugins/countdown` holds
 **named** timers like `alert` does (`start`/`add`/`pause`/`resume`/`stop`, each taking a
 `name`, default `timer`), published as `countdown.<name>` = `{running, endAt, remainingMs,
@@ -118,7 +133,25 @@ certified module using the `net` system cap), and
 Desktop / YouTube Music's local HTTP API (`/api/v1` on `:26538`, bearer token from
 `/auth/{id}`) over `net.fetch`, and the `pear` plugin exposes Play/Pause/Next/… actions.
 The `pear` module's endpoint is overridable via its `set-base-url` service (tests point it
-at a stand-in server so they never touch a real running player). The `pear` plugin also
+at a stand-in server so they never touch a real running player).
+
+**Pear authentication (mirrors pear-desktop `src/plugins/api-server`).** `POST /auth/{id}`
+(root, NOT under `/api/v1`) mints a **JWT** signed HS256 with the player's `secret`; `/api/*`
+wants it as `Authorization: Bearer <jwt>` and *also* checks the token's `id` is still in the
+player's persisted `authorizedClients`. `/api/v1/ws` is exempt from that guard but does its
+own `?token=` check. Under the default `AUTH_AT_FIRST` strategy, `/auth/{id}` for an unknown
+id opens a **native modal dialog on the user's screen** (Allow/Deny, default Deny) and
+answers **403** on Deny; once allowed the id is remembered and re-auth is silent. With
+`AuthStrategy::NONE` no token is needed at all. **The rule this forces: never authorize
+implicitly in a loop** — the host polls this module every 3s, so a naive "no token?
+authenticate" pops a dialog every 3 seconds forever. Hence in `modules/pear`: a denial is
+**sticky** (`auth_state = denied`, only the explicit `authorize` service asks again), a
+*failed* attempt is throttled to one per 60s while a *successful* one clears the throttle, and
+a 401 clears the token, re-authorizes once and replays the call. Services: `authorize`
+(explicit — what a "Connect" button calls), `auth-status`, `clear-auth`, `set-client-id`
+(a new id = a new identity for the player → token dropped, consent re-asked). `set-base-url`
+also resets the auth (another instance = another secret). `tests/pear_auth.rs` covers the
+sticky denial, the explicit retry, the stale-token replay and the client id. The `pear` plugin also
 declares a **`song-changed` trigger**: the module's `poll` service diffs the current song and
 emits two module events — `song` on **any** change **including the first observation** (so
 launching Quicktys does NOT fire the trigger; it just syncs state), and `song-changed` only on

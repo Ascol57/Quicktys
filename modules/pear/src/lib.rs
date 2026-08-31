@@ -311,38 +311,149 @@ fn base_url() -> String {
 
 struct Pear;
 
-/// A cached bearer token, obtained on first use (AUTH_AT_FIRST strategy).
+// --- Authentication ---------------------------------------------------------
+//
+// Pear's api-server (`src/plugins/api-server` in pear-desktop) guards `/api/*`
+// with a **JWT**: `POST /auth/{id}` mints one, signed HS256 with the player's
+// `secret`, and every later call presents it as `Authorization: Bearer <jwt>`.
+// The player then *also* checks that the token's `id` is still in its persisted
+// `authorizedClients` list — so a valid signature is not enough.
+//
+// The detail that dictates the design here: under the default `AUTH_AT_FIRST`
+// strategy, `POST /auth/{id}` for an id the player does not know yet opens a
+// **native modal dialog on the user's screen** (Allow / Deny, defaulting to
+// Deny) and answers **403** if they deny. Once allowed, the id is remembered and
+// later re-auth for the same id is silent.
+//
+// So we must never authorize implicitly in a loop: the host polls this module
+// every 3s, and a naive "no token? authenticate" inside every call would pop a
+// dialog every 3 seconds forever. Hence:
+//   * a denial is **sticky** (`auth_state = denied`) — only an explicit
+//     `authorize` call asks again;
+//   * a *failed* attempt is rate-limited to one per `AUTH_RETRY_SECS`, while a
+//     successful one clears the timer so a legitimately stale token recovers
+//     immediately;
+//   * a 401 clears the token and re-authorizes **once**, then replays the call.
+//
+// With `AuthStrategy::NONE` the player serves `/api/*` unauthenticated, so a
+// missing token is never fatal on its own: we try the call and only authorize
+// if it actually comes back 401.
+
+/// Client id presented to the player; shown in its Allow/Deny dialog.
+const DEFAULT_CLIENT_ID: &str = "quicktys";
+/// Minimum delay between two *failed* authorization attempts.
+const AUTH_RETRY_SECS: u64 = 60;
+
+/// `authorized` | `denied` | `unavailable` | `""` (never tried).
+fn auth_state() -> String {
+    kv_get("auth_state").unwrap_or_default()
+}
+
+fn client_id() -> String {
+    kv_get("client_id")
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| DEFAULT_CLIENT_ID.to_string())
+}
+
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// The cached bearer token, if we hold one. Never performs I/O.
 fn token() -> Option<String> {
-    if let Some(t) = kv_get("token") {
-        if !t.is_empty() {
-            return Some(t);
+    kv_get("token").filter(|t| !t.is_empty())
+}
+
+/// Forget the token and everything we knew about the authorization state.
+fn clear_auth() {
+    kv_set("token", "");
+    kv_set("auth_state", "");
+    kv_set("auth_attempt_at", "0");
+}
+
+/// Ask the player for a token. `explicit` = the user asked for it, which
+/// bypasses both the sticky denial and the retry throttle.
+fn authorize(explicit: bool) -> Result<String, String> {
+    if !explicit {
+        if auth_state() == "denied" {
+            return Err(
+                "pear desktop denied this client — call `authorize` to ask again".to_string()
+            );
+        }
+        let last = kv_get("auth_attempt_at")
+            .and_then(|s| s.parse::<u64>().ok())
+            .unwrap_or(0);
+        let elapsed = now_secs().saturating_sub(last);
+        if last > 0 && elapsed < AUTH_RETRY_SECS {
+            return Err(format!(
+                "authorization failed less than {AUTH_RETRY_SECS}s ago; not retrying yet"
+            ));
         }
     }
+    kv_set("auth_attempt_at", &now_secs().to_string());
+
+    let id = client_id();
     let request = HttpRequest {
         method: "POST".to_string(),
-        url: format!("{}/auth/quicktys", base_url()),
+        // `/auth/{id}` sits at the root, NOT under `/api/v1`.
+        url: format!("{}/auth/{id}", base_url()),
         headers: Vec::new(),
         body: None,
     };
-    let resp = fetch(&request).ok()?;
-    if resp.status != 200 {
-        return None;
+    let resp = fetch(&request).map_err(|e| {
+        kv_set("auth_state", "unavailable");
+        format!("network error reaching pear desktop: {e:?}")
+    })?;
+
+    match resp.status {
+        200 => {
+            let value: Value = serde_json::from_slice(&resp.body)
+                .map_err(|e| format!("malformed /auth response: {e}"))?;
+            let t = value
+                .get("accessToken")
+                .and_then(Value::as_str)
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| "no accessToken in the /auth response".to_string())?
+                .to_string();
+            kv_set("token", &t);
+            kv_set("auth_state", "authorized");
+            // Successful: clear the throttle so a stale token recovers at once.
+            kv_set("auth_attempt_at", "0");
+            log(Level::Info, &format!("pear: authorized as '{id}'"));
+            Ok(t)
+        }
+        // The user pressed Deny in the player's dialog. Sticky: retrying on our
+        // own would just reopen the dialog.
+        403 => {
+            kv_set("token", "");
+            kv_set("auth_state", "denied");
+            log(Level::Warn, "pear: authorization denied in the player");
+            Err("pear desktop refused: the request was denied in the player".to_string())
+        }
+        status => {
+            kv_set("auth_state", "unavailable");
+            Err(format!("pear /auth/{id} returned {status}"))
+        }
     }
-    let value: Value = serde_json::from_slice(&resp.body).ok()?;
-    let t = value.get("accessToken")?.as_str()?.to_string();
-    kv_set("token", &t);
-    Some(t)
 }
 
-/// Perform an authenticated API call. `body` (if any) is sent as JSON.
-fn api(method: &str, path: &str, body: Option<Value>) -> Result<Value, String> {
+/// One HTTP round-trip to `/api/v1<path>`, with the token if we have one.
+fn api_once(
+    method: &str,
+    path: &str,
+    body: Option<&Value>,
+    bearer: Option<&str>,
+) -> Result<(u16, Vec<u8>), String> {
     let mut headers = Vec::new();
-    if let Some(t) = token() {
+    if let Some(t) = bearer {
         headers.push(("Authorization".to_string(), format!("Bearer {t}")));
     }
     let body_bytes = body.map(|b| {
         headers.push(("Content-Type".to_string(), "application/json".to_string()));
-        serde_json::to_vec(&b).unwrap_or_default()
+        serde_json::to_vec(b).unwrap_or_default()
     });
 
     let request = HttpRequest {
@@ -352,18 +463,41 @@ fn api(method: &str, path: &str, body: Option<Value>) -> Result<Value, String> {
         body: body_bytes,
     };
     let resp = fetch(&request).map_err(|e| format!("network error: {e:?}"))?;
+    Ok((resp.status, resp.body))
+}
 
-    if resp.status == 401 {
-        kv_set("token", ""); // force re-auth next time
+/// Perform an authenticated API call. `body` (if any) is sent as JSON.
+fn api(method: &str, path: &str, body: Option<Value>) -> Result<Value, String> {
+    // No token yet? Try to get one, but tolerate failure: the player may be
+    // running with `AuthStrategy::NONE`, where `/api/*` needs none.
+    let mut bearer = token();
+    if bearer.is_none() {
+        bearer = authorize(false).ok();
+    }
+
+    let (mut status, mut body_bytes) = api_once(method, path, body.as_ref(), bearer.as_deref())?;
+
+    // A 401 means the token is stale — the player restarted with a fresh
+    // `secret`, or dropped us from `authorizedClients`. Re-authorize once and
+    // replay. Still throttled, so a player that always 401s can't spin.
+    if status == 401 {
+        kv_set("token", "");
+        let refreshed = authorize(false)?;
+        let replay = api_once(method, path, body.as_ref(), Some(&refreshed))?;
+        status = replay.0;
+        body_bytes = replay.1;
+    }
+
+    if status == 401 {
         return Err("unauthorized (pear desktop rejected the token)".to_string());
     }
-    if resp.status >= 400 {
-        return Err(format!("pear api {path} returned {}", resp.status));
+    if status >= 400 {
+        return Err(format!("pear api {path} returned {status}"));
     }
-    if resp.body.is_empty() {
+    if body_bytes.is_empty() {
         return Ok(Value::Null);
     }
-    Ok(serde_json::from_slice(&resp.body).unwrap_or(Value::Null))
+    Ok(serde_json::from_slice(&body_bytes).unwrap_or(Value::Null))
 }
 
 impl Module for Pear {
@@ -414,6 +548,16 @@ impl Module for Pear {
                     ("videoId".to_string(), Schema::string()),
                 ])),
             )
+            // Authentication (see the auth block above). `authorize` is the
+            // explicit ask — it is the only thing that reopens the player's
+            // Allow/Deny dialog after a denial.
+            .service(ServiceDecl::new("authorize"))
+            .service(ServiceDecl::new("auth-status"))
+            .service(ServiceDecl::new("clear-auth"))
+            .service(
+                ServiceDecl::new("set-client-id")
+                    .args(Schema::object([("id".to_string(), Schema::string())])),
+            )
             // Configuration (endpoint override; a settings UI comes later).
             .service(
                 ServiceDecl::new("set-base-url")
@@ -453,10 +597,37 @@ impl Module for Pear {
                 api("PATCH", "/queue", Some(json!({ "index": index })))
             }
             "poll" => poll(),
+            // Explicit: bypasses the sticky denial and the retry throttle, so
+            // this is what a "Connect to Pear" button in the UI calls.
+            "authorize" => authorize(true).map(|_| {
+                json!({ "state": auth_state(), "clientId": client_id() })
+            }),
+            "auth-status" => Ok(json!({
+                "state": auth_state(),
+                "authorized": token().is_some() && auth_state() == "authorized",
+                "hasToken": token().is_some(),
+                "clientId": client_id(),
+                "baseUrl": base_url(),
+            })),
+            "clear-auth" => {
+                clear_auth();
+                Ok(Value::Null)
+            }
+            // A different id is a different client as far as the player is
+            // concerned: the old token is useless and consent must be asked again.
+            "set-client-id" => {
+                let id = args.get("id").and_then(Value::as_str).unwrap_or_default().trim();
+                if id.is_empty() {
+                    return Err("client id is required".to_string());
+                }
+                kv_set("client_id", id);
+                clear_auth();
+                Ok(Value::Null)
+            }
             "set-base-url" => {
                 let url = args.get("url").and_then(Value::as_str).unwrap_or_default();
                 kv_set("base_url", url);
-                kv_set("token", ""); // endpoint changed → re-auth
+                clear_auth(); // another player instance → another secret, re-auth
                 Ok(Value::Null)
             }
             other => Err(format!("unknown method: {other}")),

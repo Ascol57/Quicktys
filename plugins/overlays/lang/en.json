@@ -1,0 +1,30 @@
+{
+  "name": "Overlays",
+  "description": "Browser-source overlays: install this to get the overlay editor and the /overlay/<id> pages.",
+  "actions": {
+    "create": {
+      "name": "Create overlay",
+      "description": "Create an overlay, or rename one that already exists.",
+      "config": {
+        "id": "Overlay id",
+        "title": "Title"
+      }
+    },
+    "delete": {
+      "name": "Delete overlay",
+      "config": {
+        "id": "Overlay id"
+      }
+    },
+    "refresh": {
+      "name": "Refresh overlay list",
+      "description": "Re-read the overlays and republish the count and ids."
+    }
+  },
+  "triggers": {},
+  "state": {
+    "count": { "name": "Overlay count" },
+    "ids": { "name": "Overlay ids" }
+  },
+  "settings": {}
+}

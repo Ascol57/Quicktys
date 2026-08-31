@@ -1,0 +1,33 @@
+{
+  "name": "Pear Desktop",
+  "description": "Drives Pear Desktop's local API (/api/v1), including its token authentication.",
+  "services": {
+    "play": { "name": "Play" },
+    "pause": { "name": "Pause" },
+    "toggle": { "name": "Play / Pause" },
+    "next": { "name": "Next track" },
+    "previous": { "name": "Previous track" },
+    "like": { "name": "Like" },
+    "dislike": { "name": "Dislike" },
+    "toggle-mute": { "name": "Toggle mute" },
+    "shuffle": { "name": "Shuffle" },
+    "set-volume": { "name": "Set volume" },
+    "seek-to": { "name": "Seek to" },
+    "set-queue-index": { "name": "Jump to queue position" },
+    "current-song": { "name": "Current song" },
+    "get-volume": { "name": "Get volume" },
+    "poll": { "name": "Poll" },
+    "authorize": {
+      "name": "Authorize",
+      "description": "Ask Pear Desktop for an access token. The player shows an Allow / Deny dialog the first time."
+    },
+    "auth-status": { "name": "Authorization status" },
+    "clear-auth": { "name": "Forget the token" },
+    "set-client-id": { "name": "Set client id" },
+    "set-base-url": { "name": "Set API address" }
+  },
+  "events": {
+    "song": { "name": "Song" },
+    "song-changed": { "name": "Song changed" }
+  }
+}
