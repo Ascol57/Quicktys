@@ -75,6 +75,12 @@ onMounted(async () => {
       bootInfo.value = { index: e.index, total: e.total, current: e.id };
     } else if (e?.type === "bootReady") {
       finishBoot();
+    } else if (e?.type === "extensionsChanged") {
+      // An install/uninstall happened (marketplace). Re-read the extension lists
+      // so a newly contributed view gets its menu tab straight away — otherwise
+      // it only appeared after restarting the app. `refreshExtensions` is a
+      // hoisted function declaration, so calling it from here is fine.
+      refreshExtensions();
     }
   });
   // Subscribed first (above), so a `BootReady` between now and here isn't missed;
@@ -191,19 +197,28 @@ provide("field-suggestions", (source) => {
   return [];
 });
 
-onMounted(async () => {
-  // Extensions load in the background after the window shows — wait for the
-  // loader to finish so plugin/module/widget lists are complete.
-  await bootDone;
+// Everything in the shell that depends on which extensions are loaded. Called
+// at boot AND on every `extensionsChanged`, because installing or removing an
+// extension at runtime must show up without a restart: a module contributing a
+// `view` (the `webview` overlay editor, pulled in by the Overlays plugin) adds a
+// menu tab, and the overlay alert list comes from that same module.
+async function refreshExtensions() {
   plugins.value = await ipc.listPlugins();
   // Views contributed by modules (a module's manifest may declare `view`).
   contributedViews.value = ((await ipc.listModules()) ?? [])
     .filter((m) => m.view)
     .map((m) => ({ id: m.id, name: m.name, icon: m.view.icon, label: m.view.label, entry: m.view.entry || "index.html" }));
+  await refreshOverlayAlerts();
+}
+
+onMounted(async () => {
+  // Extensions load in the background after the window shows — wait for the
+  // loader to finish so plugin/module/widget lists are complete.
+  await bootDone;
+  await refreshExtensions();
   const available = await ipc.availableLocales();
   if (available?.length) locales.value = available;
   await profilesStore.load();
-  await refreshOverlayAlerts();
   // Seed OBS autocomplete lists from current state (they update live after).
   const st = (await ipc.getState()) ?? {};
   const seed = {};
