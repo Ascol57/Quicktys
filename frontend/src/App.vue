@@ -149,27 +149,32 @@ const plugins = ref([]);
 const locales = ref(["en"]);
 const locale = ref("en");
 
-// Names of the alert widgets the user has placed (dashboard + overlays), so the
-// Alerts action can autocomplete which alert to fire. Overlays are a host
-// resource; the dashboard comes from the store (reactive).
-const overlayAlertNames = ref([]);
+// Widgets the user has placed on the overlays, so a plugin action can
+// autocomplete which one it targets by name. Overlays are a host resource (the
+// `webview` module owns them); the dashboard comes from the store (reactive).
+const overlayWidgets = ref([]);
 async function refreshOverlayAlerts() {
   const overlays = (await ipc.callModuleSafe("webview", "list-overlays", {})) ?? [];
-  overlayAlertNames.value = overlays
-    .flatMap((o) => o.widgets ?? [])
-    .filter((w) => w.type === "alert")
-    .map((w) => w.config?.name)
-    .filter(Boolean);
+  overlayWidgets.value = overlays.flatMap((o) => o.widgets ?? []);
 }
 // Overlays are module-owned; the webview editor calls this after mutations.
 provide("refresh-overlays", refreshOverlayAlerts);
-const alertNames = computed(() => {
-  const fromDash = dashboard.widgets
-    .filter((w) => w.type === "alert")
-    .map((w) => w.config?.name)
-    .filter(Boolean);
-  return [...new Set([...fromDash, ...overlayAlertNames.value])];
-});
+
+// Names the user gave to widgets of `type`, across the dashboard AND the
+// overlays. These feed the `suggest` autocomplete on the matching plugin's
+// `name` field: an `alert.show` or `countdown.start` action targets a widget by
+// that name, so offering the existing ones is what stops the action and the
+// widget silently drifting apart on a typo.
+function widgetNames(type) {
+  const pick = (list) =>
+    (list ?? [])
+      .filter((w) => w.type === type)
+      .map((w) => w.config?.name)
+      .filter(Boolean);
+  return [...new Set([...pick(dashboard.widgets), ...pick(overlayWidgets.value)])];
+}
+const alertNames = computed(() => widgetNames("alert"));
+const countdownNames = computed(() => widgetNames("countdown"));
 
 // Live OBS lists (scenes / sources) for action autocomplete — kept current from
 // the `obs.scenes` / `obs.inputs` reactive state the OBS plugin publishes.
@@ -191,6 +196,7 @@ const ttsVoices = ref([]);
 // The app exposes suggestion lists to schema fields declaring `suggest: "<src>"`.
 provide("field-suggestions", (source) => {
   if (source === "alert") return alertNames.value;
+  if (source === "countdown") return countdownNames.value;
   if (source === "tts-voice") return ttsVoices.value;
   const stateKey = OBS_SUGGEST[source];
   if (stateKey) return obsLists.value[stateKey] ?? [];

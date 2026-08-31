@@ -14,12 +14,25 @@
     "properties": {
       "name": { "type": "String", "default": "timer" },
       "format": { "type": "String", "enum": ["auto", "mm:ss", "h:mm:ss", "seconds"], "default": "auto" },
+      "fontFamily": {
+        "type": "String",
+        "enum": ["system", "sans", "rounded", "condensed", "mono", "serif"],
+        "default": "system"
+      },
+      "fontWeight": {
+        "type": "String",
+        "enum": ["300", "400", "500", "600", "700", "800", "900"],
+        "default": "800"
+      },
+      "fontScale": { "type": "Number", "default": 100, "min": 40, "max": 200 },
+      "labelPosition": { "type": "String", "enum": ["above", "below"], "default": "above" },
       "showLabel": { "type": "Boolean", "default": true },
       "showProgress": { "type": "Boolean", "default": true },
       "showWhenIdle": { "type": "Boolean", "default": true },
       "showBackground": { "type": "Boolean", "default": true },
       "warnAt": { "type": "Number", "default": 10, "min": 0, "max": 300 },
       "textColor": { "type": "Color", "default": "#ffffff" },
+      "labelColor": { "type": "Color", "default": "#ffffff" },
       "warnColor": { "type": "Color", "default": "#d3695f" },
       "accentColor": { "type": "Color", "default": "#e0a458" },
       "bgColor": { "type": "Color", "default": "#1e1e1e" },

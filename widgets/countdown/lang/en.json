@@ -4,15 +4,49 @@
   "config": {
     "name": "Countdown name",
     "format": "Time format",
+    "fontFamily": "Font",
+    "fontWeight": "Font weight",
+    "fontScale": "Text size (%)",
+    "labelPosition": "Label position",
     "showLabel": "Show label",
     "showProgress": "Show progress bar",
     "showWhenIdle": "Show when idle",
     "showBackground": "Show background",
     "warnAt": "Warn under (seconds)",
-    "textColor": "Text",
+    "textColor": "Time",
+    "labelColor": "Label",
     "warnColor": "Warning",
     "accentColor": "Progress bar",
     "bgColor": "Background",
     "radius": "Corner radius"
+  },
+  "options": {
+    "format": {
+      "auto": "Automatic",
+      "mm:ss": "Minutes : seconds",
+      "h:mm:ss": "Hours : minutes : seconds",
+      "seconds": "Seconds only"
+    },
+    "fontFamily": {
+      "system": "System",
+      "sans": "Sans-serif",
+      "rounded": "Rounded",
+      "condensed": "Condensed",
+      "mono": "Monospace",
+      "serif": "Serif"
+    },
+    "fontWeight": {
+      "300": "Light",
+      "400": "Regular",
+      "500": "Medium",
+      "600": "Semibold",
+      "700": "Bold",
+      "800": "Extrabold",
+      "900": "Black"
+    },
+    "labelPosition": {
+      "above": "Above the time",
+      "below": "Below the time"
+    }
   }
 }

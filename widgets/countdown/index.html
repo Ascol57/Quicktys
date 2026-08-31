@@ -24,8 +24,14 @@
         overflow: hidden;
         container-type: size; /* descendants' cq units scale with the widget */
         padding: min(10px, 3vmin);
-        --text: #fff; --warn: #d3695f; --accent: #e0a458; --bg: #1e1e1e;
-        --radius: 14px;
+        --text: #fff; --label: #fff; --warn: #d3695f; --accent: #e0a458;
+        --bg: #1e1e1e; --radius: 14px;
+        /* Typography knobs, all driven from the widget's settings. Only system
+           font stacks: the iframe has no network access, so a web font would
+           silently fall back anyway. */
+        --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        --weight: 800;
+        --scale: 1;
       }
       .box {
         width: 100%; height: 100%; min-width: 0; min-height: 0;
@@ -39,25 +45,34 @@
       body.bg .box { background: var(--bg); }
       body.hidden .box { opacity: 0; }
       .label {
-        color: var(--text); opacity: 0.7;
-        font-size: min(0.95rem, 11cqh); line-height: 1.1;
+        order: 0;
+        color: var(--label); opacity: 0.7;
+        font-family: var(--font);
+        font-size: calc(min(0.95rem, 11cqh) * var(--scale)); line-height: 1.1;
         max-width: 100%; text-align: center;
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       }
       .time {
+        order: 1;
         color: var(--text);
-        font-weight: 800; line-height: 1;
+        font-family: var(--font);
+        font-weight: var(--weight); line-height: 1;
         font-variant-numeric: tabular-nums;
         /* Fill the box: bounded by height and by width, so long formats
-           (h:mm:ss) shrink instead of overflowing. */
-        font-size: min(46cqh, 21cqw);
+           (h:mm:ss) shrink instead of overflowing. `--scale` tunes that
+           auto-fit rather than replacing it, so resizing still works. */
+        font-size: calc(min(46cqh, 21cqw) * var(--scale));
         transition: color 0.2s ease;
       }
+      /* Label under the clock; the progress bar stays at the bottom. */
+      body.label-below .time { order: 0; }
+      body.label-below .label { order: 1; }
       body.warn .time { color: var(--warn); }
       body.done .time { color: var(--warn); animation: pulse 1s ease-in-out infinite; }
       body.paused .time { opacity: 0.55; }
       @keyframes pulse { 50% { opacity: 0.45; } }
       .bar {
+        order: 2;
         width: 100%; max-width: 100%;
         height: max(3px, 2cqh);
         border-radius: 999px;
@@ -98,15 +113,34 @@
         return t && typeof t === "object" ? t : null;
       };
 
+      // System font stacks only — the widget iframe has no network access, so a
+      // downloaded web font would just fall back silently.
+      const FONTS = {
+        system: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
+        sans: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+        rounded: 'ui-rounded, "SF Pro Rounded", "Segoe UI Variable Display", Nunito, system-ui, sans-serif',
+        condensed: '"Roboto Condensed", "Arial Narrow", "Segoe UI", sans-serif',
+        mono: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
+        serif: 'ui-serif, Georgia, "Times New Roman", serif',
+      };
+
       function applyConfig() {
         const s = document.body.style;
         const set = (k, v) => v !== undefined && s.setProperty(k, v);
         set("--text", config.textColor);
+        set("--label", config.labelColor ?? config.textColor);
         set("--warn", config.warnColor);
         set("--accent", config.accentColor);
         set("--bg", config.bgColor);
+        set("--font", FONTS[config.fontFamily]);
+        set("--weight", config.fontWeight);
+        // Stored as a percentage so the settings slider stays on whole numbers.
+        if (config.fontScale !== undefined) {
+          s.setProperty("--scale", String(Number(config.fontScale) / 100 || 1));
+        }
         if (config.radius !== undefined) s.setProperty("--radius", config.radius + "px");
         document.body.classList.toggle("bg", on("showBackground"));
+        document.body.classList.toggle("label-below", config.labelPosition === "below");
       }
 
       function format(ms) {

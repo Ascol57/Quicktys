@@ -123,6 +123,15 @@ it); a run that expired while the app was closed is restored finished and pre-ac
 boot fires nothing — same rule as `pear`'s first observation. Widget booleans all default
 **true** and are read as `!== false`, because `WidgetConfigForm.vue` renders an unset boolean
 as ON (`get(key) !== false`) — name them `showX`, never `hideX`, or the switch lies.
+Two more widget-config conventions this surfaced: a plugin `name` field that targets a widget
+declares `.suggest("<widget type>")`, and **the source must be wired in `App.vue`'s
+`field-suggestions` provider** (`alert`, `countdown`, `tts-voice`, the `obs-*` state lists) —
+an unwired source silently autocompletes nothing, which is how a user ends up guessing the
+name. Names are collected by `widgetNames(type)` across the dashboard **and** the overlays.
+And enum option labels live at `widget.<type>.options.<key>.<value>` — deliberately NOT under
+`…config.<key>`, which must stay a string since it is the field's own label (a key resolving
+to an object breaks `t()`). Fonts in a widget must be **system stacks only**: the iframe has
+no network access, so a web font silently falls back.
 
 Reference extensions used by the host integration tests (built on demand): `plugins/time`
 (plugin, no module), `plugins/notify` (a plugin with `log`/`toast` actions — `toast` uses the

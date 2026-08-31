@@ -4,15 +4,49 @@
   "config": {
     "name": "Nom du compte à rebours",
     "format": "Format de l'heure",
+    "fontFamily": "Police",
+    "fontWeight": "Graisse",
+    "fontScale": "Taille du texte (%)",
+    "labelPosition": "Position du libellé",
     "showLabel": "Afficher le libellé",
     "showProgress": "Afficher la barre de progression",
     "showWhenIdle": "Afficher au repos",
     "showBackground": "Afficher le fond",
     "warnAt": "Alerte en dessous de (secondes)",
-    "textColor": "Texte",
+    "textColor": "Chiffres",
+    "labelColor": "Libellé",
     "warnColor": "Alerte",
     "accentColor": "Barre de progression",
     "bgColor": "Fond",
     "radius": "Arrondi des coins"
+  },
+  "options": {
+    "format": {
+      "auto": "Automatique",
+      "mm:ss": "Minutes : secondes",
+      "h:mm:ss": "Heures : minutes : secondes",
+      "seconds": "Secondes uniquement"
+    },
+    "fontFamily": {
+      "system": "Système",
+      "sans": "Sans empattement",
+      "rounded": "Arrondie",
+      "condensed": "Condensée",
+      "mono": "Chasse fixe",
+      "serif": "À empattement"
+    },
+    "fontWeight": {
+      "300": "Fine",
+      "400": "Normale",
+      "500": "Moyenne",
+      "600": "Demi-grasse",
+      "700": "Grasse",
+      "800": "Extra-grasse",
+      "900": "Noire"
+    },
+    "labelPosition": {
+      "above": "Au-dessus des chiffres",
+      "below": "En dessous des chiffres"
+    }
   }
 }

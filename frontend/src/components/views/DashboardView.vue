@@ -131,9 +131,15 @@ function pick(w) {
 const widgetProperties = (type) => def(type)?.config?.properties ?? {};
 const hasSettings = (type) => Object.keys(widgetProperties(type)).length > 0;
 function propOptions(type, key, schema) {
-  // `source` gets translated labels; other enums use their raw values.
+  // `source` gets translated labels; other enums use the label the widget ships
+  // under `widget.<type>.options.<key>.<value>`, falling back to the raw value.
+  // (Deliberately NOT nested under `…config.<key>`, which must stay a string —
+  // it is the field's own label.)
   if (key === "source") return sourceOptions(type);
-  return (schema.enum ?? []).map((v) => ({ value: v, label: String(v) }));
+  return (schema.enum ?? []).map((v) => {
+    const k = `widget.${type}.options.${key}.${v}`;
+    return { value: v, label: te(k) ? t(k) : String(v) };
+  });
 }
 function propLabel(type, key) {
   const k = `widget.${type}.config.${key}`;
