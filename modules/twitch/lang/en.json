@@ -1,0 +1,12 @@
+{
+  "name": "Twitch",
+  "description": "Certified driver for the Twitch Helix API (chat, announcements, stream info).",
+  "services": {
+    "set-auth": { "name": "Set authentication" },
+    "set-base-url": { "name": "Set API base URL" },
+    "send-chat": { "name": "Send chat message" },
+    "announce": { "name": "Announce" },
+    "get-stream": { "name": "Get stream info" },
+    "helix": { "name": "Helix request" }
+  }
+}

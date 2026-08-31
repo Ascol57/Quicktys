@@ -1,0 +1,39 @@
+[package]
+name = "quicktys-host"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+quicktys-core.workspace = true
+quicktys-schema.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+wasmtime.workspace = true
+wasmtime-wasi.workspace = true
+# TLS for the host HTTP client (https:// — Discord webhooks, Twitch, …). `ring`
+# provider for portable builds; roots bundled via webpki-roots (no system deps).
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "0.26"
+# Real audio playback for the `audio` capability (the `sound` module). Decodes
+# wav/mp3/ogg/flac; a dedicated thread owns the (!Send) output stream.
+rodio = "0.20"
+# Cross-platform input synthesis for the `input` capability (keyboard/mouse).
+# x11rb backend (pure Rust, no libxdo) + wayland + libei (portal-based input on
+# GNOME/KDE Wayland, where the wlroots virtual-input protocols aren't available).
+enigo = { version = "0.3", default-features = false, features = ["x11rb", "wayland", "libei"] }
+# HID devices for the `hid` capability (Stream Deck & co, M7). `linux-native` is a
+# pure-Rust hidraw backend → no libudev/libhidapi/libusb system deps to link.
+[target.'cfg(target_os = "linux")'.dependencies]
+hidapi = { version = "2", default-features = false, features = ["linux-native"] }
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+hidapi = "2"
+
+[dev-dependencies]
+# The runner-over-WASM integration test drives the core Runner against the host
+# invoker; it needs the expression engine to build a Runner.
+quicktys-expr.workspace = true

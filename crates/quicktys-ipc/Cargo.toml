@@ -1,0 +1,23 @@
+[package]
+name = "quicktys-ipc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+quicktys-core.workspace = true
+quicktys-schema.workspace = true
+quicktys-install.workspace = true
+quicktys-cert.workspace = true
+quicktys-registry.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+# The runner needs a (sandboxed) expression engine; tests build one.
+quicktys-expr.workspace = true
+# Build real `.qtpkg` packages for the registry-install integration test.
+quicktys-pkg.workspace = true

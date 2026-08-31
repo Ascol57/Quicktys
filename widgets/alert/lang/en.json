@@ -1,0 +1,13 @@
+{
+  "name": "Alert",
+  "description": "An alert box fired by name from the Alerts action (title, content, image).",
+  "config": {
+    "name": "Alert name",
+    "duration": "Duration (ms)",
+    "bgColor": "Background",
+    "titleColor": "Title color",
+    "contentColor": "Content color",
+    "accentColor": "Accent",
+    "radius": "Corner radius"
+  }
+}

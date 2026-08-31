@@ -1,0 +1,174 @@
+package quicktys:api@0.2.0;
+
+// Quicktys host interfaces — the capabilities the trusted Rust kernel provides.
+//
+// Two trust tiers consume these:
+//   * PLUGINS (anyone)   import only the "safe" interfaces: logging, storage,
+//     reactivity, modules. They have NO direct access to network/OS/devices.
+//   * MODULES (certified) additionally import the SYSTEM interfaces (net,
+//     input, audio, hid, files, process, timers) — the elevated capabilities
+//     that let a module actually "talk to" OBS, Twitch, the soundcard, the
+//     keyboard, a Stream Deck, etc.
+//
+// A module/plugin only receives the interfaces its manifest requests AND that
+// the user (or, for system caps, the certification) has granted.
+
+// --- Shared (both tiers) ----------------------------------------------------
+
+interface logging {
+    enum level { trace, debug, info, warn, error }
+    log: func(lvl: level, message: string);
+}
+
+// Persistent kv store + secrets, namespaced per extension id.
+interface storage {
+    kv-get: func(key: string) -> option<string>;
+    kv-set: func(key: string, value: string);
+    get-secret: func(key: string) -> option<string>;
+}
+
+// --- Plugin-facing ----------------------------------------------------------
+
+// Reactive state + trigger firing onto the host event bus.
+interface reactivity {
+    // Push a new JSON value for a declared state key (propagated to the UI).
+    set-state: func(key: string, value-json: string);
+    // Fire a declared trigger; the host evaluates matching profiles' triggers.
+    emit-trigger: func(trigger-id: string, context-json: string);
+    // Show a transient notification in the UI (level: info | success | warn | error).
+    notify: func(message: string, level: string);
+}
+
+// How a PLUGIN reaches a MODULE. The host enforces that the plugin declared the
+// dependency and that the module/method exists; calls and events are validated
+// against the module's published service schemas (same JSON-over-typed model as
+// actions). Static component-linking is an optimization layered on top later.
+interface modules {
+    variant call-error {
+        not-installed,
+        no-such-method,
+        denied,
+        failed(string),
+    }
+    // Request/response call into a module service method.
+    call: func(module-id: string, method: string, args-json: string) -> result<string, call-error>;
+    // Subscribe to a module event; deliveries arrive at guest.on-module-event.
+    subscribe: func(module-id: string, event-id: string) -> result<_, call-error>;
+    unsubscribe: func(module-id: string, event-id: string);
+}
+
+// --- Module-facing ----------------------------------------------------------
+
+// How a MODULE pushes events to its subscribers (plugins) and to the host.
+interface events {
+    emit-event: func(event-id: string, payload-json: string);
+}
+
+// OAuth FACILITATION (core helper, module-facing). The CORE drives the whole
+// flow — opening the browser, capturing the redirect, exchanging the code,
+// refreshing transparently, and storing tokens securely. The MODULE only
+// supplies the provider config (the "env": endpoints, client id, scopes) and
+// later asks for a fresh access token. The module never touches the OAuth
+// mechanics or stores raw tokens itself.
+interface oauth {
+    record provider-config {
+        auth-url: string,
+        token-url: string,
+        client-id: string,
+        client-secret: option<string>,   // omitted for public/PKCE flows
+        scopes: list<string>,
+        redirect: string,                 // loopback URL or custom scheme
+        use-pkce: bool,
+    }
+    // Run the interactive authorization flow. On success the core has stored a
+    // refreshable token-set keyed by `provider`.
+    authorize: func(provider: string, config: provider-config) -> result<_, string>;
+    // Return a currently-valid access token, refreshing transparently if needed.
+    access-token: func(provider: string) -> result<string, string>;
+    // Whether a valid (or refreshable) token-set exists for `provider`.
+    is-authorized: func(provider: string) -> bool;
+    // Forget the stored token-set for `provider`.
+    revoke: func(provider: string);
+}
+
+// SYSTEM capabilities — granted ONLY to certified modules. This is where the
+// real-world IO lives, kept out of the plugin sandbox entirely.
+
+interface net {
+    // Raw TCP + outbound websocket, host-mediated. Returns an opaque handle;
+    // inbound data is delivered to the module via on-host-event(event-id, ...).
+    variant net-error { refused, timeout, tls(string), other(string) }
+    tcp-connect: func(host: string, port: u16, event-id: string) -> result<u64, net-error>;
+    ws-connect: func(url: string, event-id: string) -> result<u64, net-error>;
+    send: func(handle: u64, data: list<u8>) -> result<_, net-error>;
+    close: func(handle: u64);
+
+    record http-request {
+        method: string,
+        url: string,
+        headers: list<tuple<string, string>>,
+        body: option<list<u8>>,
+    }
+    record http-response { status: u16, headers: list<tuple<string, string>>, body: list<u8> }
+    fetch: func(req: http-request) -> result<http-response, net-error>;
+}
+
+// OS input injection ("talk to the keyboard/mouse").
+interface input {
+    send-key: func(code: u32, down: bool);
+    send-mouse-move: func(x: s32, y: s32);
+    send-mouse-button: func(button: u8, down: bool);
+    // Higher-level, cross-platform helpers (host-side via a synthesis backend).
+    // Type a string of text.
+    type-text: func(text: string) -> result<_, string>;
+    // Press a chord, e.g. ["ctrl","shift","c"] (modifiers held around the last).
+    key-combo: func(keys: list<string>) -> result<_, string>;
+    // Click a mouse button (0=left, 1=middle, 2=right).
+    mouse-click: func(button: u8) -> result<_, string>;
+}
+
+// Audio device IO ("talk to the system audio").
+interface audio {
+    list-output-devices: func() -> list<string>;
+    play-buffer: func(device: option<string>, pcm: list<u8>, sample-rate: u32, channels: u8) -> result<_, string>;
+    // Decode and play an audio file (wav/mp3/ogg/flac) at `volume` (1.0 = 100%).
+    play-file: func(path: string, volume: f32) -> result<_, string>;
+    // Text-to-speech (say / SAPI / speech-dispatcher). `voice` is a platform
+    // voice name (macOS/Windows) or language code (Linux); empty = OS default.
+    speak: func(text: string, voice: string) -> result<_, string>;
+    // Installed TTS voices / languages, for the UI to offer as a choice.
+    list-voices: func() -> list<string>;
+}
+
+// USB HID (Stream Deck, Elgato, ...).
+interface hid {
+    enumerate: func(vendor-id: option<u16>, product-id: option<u16>) -> list<string>;
+    open: func(path: string, event-id: string) -> result<u64, string>;
+    write: func(handle: u64, data: list<u8>) -> result<_, string>;
+    close: func(handle: u64);
+}
+
+// Scoped filesystem (a module's own sandboxed directory only).
+interface files {
+    read: func(path: string) -> result<list<u8>, string>;
+    write: func(path: string, data: list<u8>) -> result<_, string>;
+    // `list` is a WIT keyword (the `list<T>` type), so the directory listing
+    // function is named `list-dir`.
+    list-dir: func(path: string) -> result<list<string>, string>;
+}
+
+// Scoped process spawning (declared allowlist only).
+interface process {
+    spawn: func(program: string, args: list<string>) -> result<u64, string>;
+    kill: func(handle: u64);
+    // Run a command line through the OS shell (cmd /C on Windows, sh -c else).
+    run-shell: func(command: string) -> result<u64, string>;
+    // Open a file / URL with the OS default handler (start / open / xdg-open).
+    open-path: func(target: string) -> result<_, string>;
+}
+
+interface timers {
+    // Fire on-host-event(event-id, "") after `ms`; repeating if `repeat`.
+    set-timer: func(ms: u64, repeat: bool, event-id: string) -> u64;
+    clear-timer: func(handle: u64);
+}

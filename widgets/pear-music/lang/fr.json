@@ -1,0 +1,19 @@
+{
+  "name": "Musique (Pear)",
+  "description": "Carte « en écoute » personnalisable — choisissez les éléments affichés, leurs couleurs et arrondis.",
+  "config": {
+    "showCover": "Afficher la pochette",
+    "showTitle": "Afficher le titre",
+    "showArtists": "Afficher les artistes",
+    "showProgress": "Afficher la barre de progression",
+    "showTime": "Afficher le temps",
+    "bgColor": "Fond",
+    "titleColor": "Couleur du titre",
+    "artistColor": "Couleur des artistes",
+    "accentColor": "Couleur de progression",
+    "barColor": "Couleur de la piste",
+    "radius": "Arrondi des coins",
+    "coverRadius": "Arrondi de la pochette",
+    "titleSize": "Taille du titre"
+  }
+}

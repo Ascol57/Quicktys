@@ -1,0 +1,20 @@
+[package]
+name = "quicktys-expr"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Unified, sandboxed expression engine (Rhai) for templating and automation control flow."
+
+[dependencies]
+quicktys-schema.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+# `internals` exposes the AST node types so we can walk an expression and
+# extract its variable dependencies (targeted reactive re-eval). `sync` comes
+# from the workspace pin (Send+Sync Dynamic/AST, needed host-side).
+rhai = { workspace = true, features = ["internals"] }
+
+[dev-dependencies]
+# Tests build schemas from inline YAML.
+serde_yaml.workspace = true

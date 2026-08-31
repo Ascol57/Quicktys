@@ -1,0 +1,20 @@
+{
+  "name": "Discord",
+  "description": "Post messages to Discord via an incoming webhook.",
+  "fields": {
+    "url": "Webhook URL",
+    "content": "Message",
+    "username": "Username (optional)",
+    "avatar": "Avatar URL (optional)"
+  },
+  "actions": {
+    "webhook": {
+      "name": "Send webhook message"
+    }
+  },
+  "triggers": {},
+  "state": {},
+  "settings": {
+    "webhook": "Default webhook URL"
+  }
+}

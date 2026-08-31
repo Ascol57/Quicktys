@@ -1,0 +1,1 @@
+{ "name": "Système", "description": "Exécute des commandes et ouvre des fichiers/URLs.", "services": { "shell": {"name":"Exécuter une commande"}, "open": {"name":"Ouvrir"}, "run": {"name":"Lancer un programme"} } }

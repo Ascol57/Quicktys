@@ -1,0 +1,1 @@
+{ "name": "Input", "description": "Synthetic keyboard and mouse input.", "services": { "type": {"name":"Type text"}, "key-combo": {"name":"Key combo"}, "mouse-click": {"name":"Mouse click"} } }

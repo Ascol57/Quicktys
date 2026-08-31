@@ -1,0 +1,17 @@
+[package]
+name = "quicktys-regserve"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "quicktys-regserve"
+path = "src/main.rs"
+
+[dependencies]
+# Build content-addressed `.qtpkg` blobs and the index, and (optionally) sign the
+# index — reusing the same crates the app uses, so a dev registry is byte-faithful.
+quicktys-pkg.workspace = true
+quicktys-registry.workspace = true
+quicktys-crypto.workspace = true
+serde_json.workspace = true

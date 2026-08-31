@@ -1,0 +1,1 @@
+{ "name": "Entrées", "description": "Entrées clavier et souris synthétiques.", "services": { "type": {"name":"Saisir du texte"}, "key-combo": {"name":"Combinaison de touches"}, "mouse-click": {"name":"Clic souris"} } }

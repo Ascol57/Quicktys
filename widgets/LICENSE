@@ -1,0 +1,7 @@
+Proprietary — source-available. Copyright (C) 2026 Ascol57. All rights reserved.
+
+The extensions in this directory are NOT covered by the AGPL licence of the
+Quicktys core. See ../LICENSE-EXTENSIONS for the terms that apply to them, and
+../COPYING.md for the map of which licence covers which part of this repository.
+
+SPDX: LicenseRef-Ascol57-Proprietary

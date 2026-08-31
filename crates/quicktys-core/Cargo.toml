@@ -1,0 +1,23 @@
+[package]
+name = "quicktys-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+quicktys-schema.workspace = true
+quicktys-expr.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+handlebars.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+# Combinators for the automation runner (join_all / select_all over a dynamic
+# set of branch futures). tokio-util is intentionally avoided (not vendored);
+# cancellation is a small watch-based token in `cancel`.
+futures = "0.3"
+# Real semver ranges for module dependency requirements (`^1`, `>=1.2, <2`, `~1.4`).
+semver = "1"

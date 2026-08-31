@@ -1,0 +1,1 @@
+{ "name": "Input", "description": "Type text, press hotkeys, click the mouse.", "fields": { "text": "Text", "keys": "Keys (e.g. ctrl+shift+c)", "button": "Button" }, "actions": { "type-text": {"name":"Type text"}, "hotkey": {"name":"Press hotkey"}, "mouse-click": {"name":"Mouse click"} }, "triggers":{}, "state":{}, "settings":{} }

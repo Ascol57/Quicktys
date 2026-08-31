@@ -1,0 +1,5 @@
+{
+  "name": "HTTP",
+  "description": "Generic HTTP(S) requests for plugins (Discord webhooks, REST, …).",
+  "services": { "request": { "name": "HTTP request" } }
+}

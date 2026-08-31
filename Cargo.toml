@@ -1,0 +1,73 @@
+# Quicktys — host workspace (Rust + Tauri)
+# Extensions (./plugins and ./modules) are WASM components built for the
+# `wasm32-wasip2` target, so they are EXCLUDED from this host workspace.
+[workspace]
+resolver = "2"
+members = [
+    "crates/quicktys-app",
+    "crates/quicktys-core",
+    "crates/quicktys-schema",
+    "crates/quicktys-expr",
+    "crates/quicktys-host",
+    "crates/quicktys-ipc",
+    "crates/quicktys-pkg",
+    "crates/quicktys-install",
+    "crates/quicktys-crypto",
+    "crates/quicktys-cert",
+    "crates/quicktys-registry",
+    "crates/quicktys-regserve",
+    "crates/quicktys-pack",
+    "crates/quicktys-migrate",
+    "crates/quicktys-plugin-sdk",
+    "crates/quicktys-module-sdk",
+]
+exclude = ["plugins", "modules"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+# Clean-room rewrite — NOT MPL (CastMate's license). Core is AGPL-3.0 + the
+# Quicktys Extension Exception (ABI-separated plugins/modules/widgets are not
+# derivative works) + CLA. Texts: LICENSE + LICENSE-EXCEPTION, mapped in
+# COPYING.md (CLA still TBD; see ARCHITECTURE §0bis). Full SPDX for these crates:
+# `AGPL-3.0-only WITH quicktys-extension-exception` — the `license` field below
+# keeps the bare id because that exception is not a registered SPDX identifier.
+license = "AGPL-3.0-only"
+repository = "https://github.com/Ascol57/Quicktys"
+
+# NOTE: versions are first-draft and must be pinned/verified during milestone M1.
+[workspace.dependencies]
+quicktys-core = { path = "crates/quicktys-core" }
+quicktys-schema = { path = "crates/quicktys-schema" }
+quicktys-expr = { path = "crates/quicktys-expr" }
+quicktys-host = { path = "crates/quicktys-host" }
+quicktys-ipc = { path = "crates/quicktys-ipc" }
+quicktys-pkg = { path = "crates/quicktys-pkg" }
+quicktys-install = { path = "crates/quicktys-install" }
+quicktys-crypto = { path = "crates/quicktys-crypto" }
+quicktys-cert = { path = "crates/quicktys-cert" }
+quicktys-registry = { path = "crates/quicktys-registry" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+anyhow = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Sandboxed expression engine (conditions/values + automation control flow).
+rhai = { version = "1", features = ["sync"] }
+
+# Handlebars templating for `{{ }}` string regions (variables, helpers, loops).
+handlebars = "6"
+
+# WebAssembly Component Model host — versions pinned **exactly** (M0) for
+# reproducible builds. The host generates its bindings with wasmtime's own
+# Component-Model `bindgen!`; it does NOT use the `wit-bindgen` crate. The guest
+# ABI generator `wit-bindgen` is pinned to `=0.36.0` in each extension's own
+# manifest (`plugins/*`, `modules/*` — separate packages outside this workspace;
+# newer 0.5x needs the unstable `wasip2` std feature).
+wasmtime = { version = "=27.0.0", features = ["component-model", "async"] }
+wasmtime-wasi = "=27.0.0"

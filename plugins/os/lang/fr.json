@@ -1,0 +1,1 @@
+{ "name": "Système", "description": "Exécute des commandes shell et ouvre des fichiers/URLs.", "fields": { "command": "Commande", "target": "Fichier ou URL" }, "actions": { "shell": {"name":"Exécuter une commande"}, "open": {"name":"Ouvrir un fichier / URL"} }, "triggers":{}, "state":{}, "settings":{} }

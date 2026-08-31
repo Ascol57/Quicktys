@@ -1,0 +1,15 @@
+{
+  "id": "button",
+  "kind": "widget",
+  "name": "Button",
+  "icon": "pi pi-bolt",
+  "template": "button",
+  "config": {
+    "type": "Object",
+    "properties": {
+      "label": { "type": "String", "default": "Button" },
+      "icon": { "type": "String", "default": "" },
+      "color": { "type": "String", "default": "#7c5cff" }
+    }
+  }
+}

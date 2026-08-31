@@ -1,0 +1,20 @@
+# `discord` plugin — post messages to a Discord channel via an incoming webhook.
+# No Discord-specific module: it just formats the payload and sends it through the
+# generic `http` net-driver module. Built for wasm32-wasip2:
+#   cargo build -p discord-plugin --target wasm32-wasip2 --release
+[package]
+name = "discord-plugin"
+version = "0.1.0"
+edition = "2021"
+# Reference extension: proprietary, source-available, (C) Ascol57 — third-party
+# extensions may pick any licence (Extension Exception). See LICENSE-EXTENSIONS.
+license = "LicenseRef-Ascol57-Proprietary"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+quicktys-plugin-sdk = { path = "../../crates/quicktys-plugin-sdk" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+wit-bindgen = "=0.36.0"

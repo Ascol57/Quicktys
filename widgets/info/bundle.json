@@ -1,0 +1,16 @@
+{
+  "id": "info",
+  "kind": "widget",
+  "name": "Info box",
+  "icon": "pi pi-hashtag",
+  "template": "info",
+  "config": {
+    "type": "Object",
+    "properties": {
+      "source": {
+        "type": "String",
+        "enum": ["plugins", "modules", "profiles", "automations", "widgets", "webview"]
+      }
+    }
+  }
+}

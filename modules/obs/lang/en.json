@@ -1,0 +1,24 @@
+{
+  "name": "OBS Studio",
+  "description": "Talks to OBS Studio over obs-websocket v5.",
+  "services": {
+    "set-url": { "name": "Set URL" },
+    "set-password": { "name": "Set password" },
+    "poll": { "name": "Poll" },
+    "request": { "name": "Request" },
+    "set-source-enabled": { "name": "Set source enabled" },
+    "set-source-transform": { "name": "Set source transform" }
+  },
+  "events": {
+    "scene-changed": { "name": "Scene changed" },
+    "media-ended": { "name": "Media ended" },
+    "media-started": { "name": "Media started" },
+    "replay-saved": { "name": "Replay saved" },
+    "stream-state": { "name": "Stream state" },
+    "record-state": { "name": "Record state" },
+    "replay-state": { "name": "Replay buffer state" },
+    "vcam-state": { "name": "Virtual camera state" },
+    "studio-state": { "name": "Studio mode state" },
+    "state": { "name": "State sync" }
+  }
+}

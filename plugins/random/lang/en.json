@@ -1,0 +1,33 @@
+{
+  "name": "Random",
+  "description": "Dice, numbers, coin flips, chance and random picks.",
+  "actions": {
+    "number": {
+      "name": "Random number",
+      "config": {
+        "min": { "label": "Minimum" },
+        "max": { "label": "Maximum" },
+        "integer": { "label": "Whole number" }
+      }
+    },
+    "dice": {
+      "name": "Roll dice",
+      "config": {
+        "count": { "label": "Number of dice" },
+        "sides": { "label": "Sides per die" }
+      }
+    },
+    "coin": { "name": "Flip a coin", "config": {} },
+    "chance": {
+      "name": "Random chance",
+      "config": { "percent": { "label": "Chance (%)" } }
+    },
+    "pick": {
+      "name": "Pick from list",
+      "config": { "items": { "label": "Items" } }
+    }
+  },
+  "triggers": {},
+  "state": {},
+  "settings": {}
+}

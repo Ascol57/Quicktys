@@ -1,0 +1,1 @@
+{ "name": "Entrées", "description": "Saisir du texte, presser des raccourcis, cliquer.", "fields": { "text": "Texte", "keys": "Touches (ex. ctrl+shift+c)", "button": "Bouton" }, "actions": { "type-text": {"name":"Saisir du texte"}, "hotkey": {"name":"Presser un raccourci"}, "mouse-click": {"name":"Clic souris"} }, "triggers":{}, "state":{}, "settings":{} }

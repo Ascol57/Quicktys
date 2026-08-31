@@ -1,0 +1,14 @@
+[package]
+name = "quicktys-registry"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+quicktys-pkg.workspace = true
+quicktys-crypto.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+# Semver ranges for dependency resolution over the registry index.
+semver = "1"

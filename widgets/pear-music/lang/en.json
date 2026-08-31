@@ -1,0 +1,19 @@
+{
+  "name": "Music (Pear)",
+  "description": "Customizable now-playing card — pick which elements show, their colors and roundness.",
+  "config": {
+    "showCover": "Show cover",
+    "showTitle": "Show title",
+    "showArtists": "Show artists",
+    "showProgress": "Show progress bar",
+    "showTime": "Show time",
+    "bgColor": "Background",
+    "titleColor": "Title color",
+    "artistColor": "Artist color",
+    "accentColor": "Progress color",
+    "barColor": "Track color",
+    "radius": "Corner radius",
+    "coverRadius": "Cover radius",
+    "titleSize": "Title size"
+  }
+}

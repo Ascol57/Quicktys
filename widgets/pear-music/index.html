@@ -1,0 +1,169 @@
+<!doctype html>
+<!-- Pear "Music" display widget: a customizable now-playing card (cover, title,
+     artists, smooth progress bar). Display-only. Every element is toggled and
+     coloured by its config; the progress bar interpolates between `pear.position`
+     ticks so it scrolls smoothly. -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        font-family: system-ui, sans-serif;
+        /* The widget is its own document, so container-query units track its
+           own box — text then scales with the widget's height. */
+        container-type: size;
+        /* Config-driven custom properties (defaults mirror bundle.json). */
+        --bg: #1e1e1e;
+        --title: #fff;
+        --artist: #a0a0a0;
+        --accent: #7ec27e;
+        --bar: #3a3a3a;
+        --radius: 12px;
+        --cover-radius: 8px;
+        --title-size: 15px;
+      }
+      .card {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        /* Spacing scales with the widget size too (cqmin = smaller edge). */
+        gap: min(0.6rem, 5cqmin);
+        padding: min(0.5rem, 5cqmin);
+        background: var(--bg);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+      .cover {
+        flex: 0 0 auto;
+        aspect-ratio: 1;
+        height: 100%;
+        min-height: 0;
+        border-radius: var(--cover-radius);
+        background: #2a2a2a center / cover no-repeat;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #555;
+        font-size: 1rem;
+      }
+      .body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: min(0.25rem, 1.5cqh); }
+      .title {
+        color: var(--title);
+        /* Cap at the configured size; shrink with the widget height when small. */
+        font-size: min(var(--title-size), 22cqh);
+        font-weight: 700;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .artist {
+        color: var(--artist);
+        font-size: min(calc(var(--title-size) * 0.62), 15cqh);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .progress { margin-top: min(0.35rem, 2cqh); display: flex; flex-direction: column; gap: min(0.25rem, 1.5cqh); }
+      .track { height: min(5px, 3cqh); border-radius: 3px; background: var(--bar); overflow: hidden; }
+      .fill { height: 100%; width: 0; background: var(--accent); border-radius: 3px; }
+      .time {
+        display: flex; justify-content: space-between;
+        font-size: min(0.7rem, 12cqh); color: var(--artist);
+        font-variant-numeric: tabular-nums;
+      }
+      .hidden { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <div class="card" id="card">
+      <div class="cover" id="cover">♪</div>
+      <div class="body">
+        <div class="title" id="title">—</div>
+        <div class="artist" id="artist"></div>
+        <div class="progress" id="progress">
+          <div class="track"><div class="fill" id="fill"></div></div>
+          <div class="time" id="timeRow"><span id="cur">0:00</span><span id="dur">0:00</span></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let state = {};
+      let config = {};
+      // Progress interpolation: last known position (s) + when we saw it.
+      let pos = 0, posAt = 0, playing = false, duration = 0;
+
+      const esc = (s) => String(s ?? "");
+      const $ = (id) => document.getElementById(id);
+      const fmt = (s) => {
+        if (!isFinite(s) || s < 0) s = 0;
+        const m = Math.floor(s / 60), ss = Math.floor(s % 60);
+        return `${m}:${ss < 10 ? "0" : ""}${ss}`;
+      };
+      const show = (el, on) => el.classList.toggle("hidden", !on);
+      const on = (key, dflt) => (config[key] === undefined ? dflt : !!config[key]);
+
+      function applyConfig() {
+        const s = document.body.style;
+        const setVar = (k, v) => v !== undefined && s.setProperty(k, v);
+        setVar("--bg", config.bgColor);
+        setVar("--title", config.titleColor);
+        setVar("--artist", config.artistColor);
+        setVar("--accent", config.accentColor);
+        setVar("--bar", config.barColor);
+        if (config.radius !== undefined) s.setProperty("--radius", config.radius + "px");
+        if (config.coverRadius !== undefined) s.setProperty("--cover-radius", config.coverRadius + "px");
+        if (config.titleSize !== undefined) s.setProperty("--title-size", config.titleSize + "px");
+        show($("cover"), on("showCover", true));
+        show($("title"), on("showTitle", true));
+        show($("artist"), on("showArtists", true));
+        show($("progress"), on("showProgress", true));
+        show($("timeRow"), on("showTime", true));
+      }
+
+      function artistsText() {
+        const a = state["pear.artists"];
+        if (Array.isArray(a) && a.length) return a.join(", ");
+        return state["pear.artist"] ?? "";
+      }
+
+      function paint() {
+        const cover = state["pear.cover"];
+        $("cover").style.backgroundImage = cover ? `url('${esc(cover).replace(/'/g, "%27")}')` : "";
+        $("cover").textContent = cover ? "" : "♪";
+        $("title").textContent = esc(state["pear.title"] ?? "—");
+        $("artist").textContent = artistsText();
+        // Refresh interpolation inputs from state.
+        duration = Number(state["pear.duration"]) || 0;
+        const p = Number(state["pear.position"]) || 0;
+        pos = p;
+        posAt = performance.now();
+        playing = state["pear.playing"] !== false;
+        $("dur").textContent = fmt(duration);
+        tick();
+      }
+
+      function tick() {
+        let elapsed = pos;
+        if (playing) elapsed = pos + (performance.now() - posAt) / 1000;
+        if (duration > 0) elapsed = Math.min(elapsed, duration);
+        const pct = duration > 0 ? (elapsed / duration) * 100 : 0;
+        $("fill").style.width = pct + "%";
+        $("cur").textContent = fmt(elapsed);
+      }
+      setInterval(tick, 250);
+
+      window.addEventListener("message", (e) => {
+        const d = e.data;
+        if (!d || d.source !== "quicktys") return;
+        if (d.type === "config") {
+          config = d.config || {};
+          applyConfig();
+        } else if (d.type === "state") {
+          state = d.state || {};
+          paint();
+        }
+      });
+      applyConfig();
+      parent.postMessage({ source: "quicktys-widget", type: "ready" }, "*");
+    </script>
+  </body>
+</html>

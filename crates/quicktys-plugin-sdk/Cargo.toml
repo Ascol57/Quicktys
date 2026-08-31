@@ -1,0 +1,14 @@
+[package]
+name = "quicktys-plugin-sdk"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Guest-side SDK for writing Quicktys plugins in Rust (compiles to a WASM component)."
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+# Pure schema model (no OS deps) — reused so plugin manifests validate against
+# the same schema types the host uses. `wit_bindgen::generate!` runs in the
+# plugin crate itself (via `define_plugin!`), so the SDK does not depend on it.
+quicktys-schema = { path = "../quicktys-schema" }

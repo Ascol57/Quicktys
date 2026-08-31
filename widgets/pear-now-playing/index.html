@@ -1,0 +1,115 @@
+<!doctype html>
+<!-- Pear "Now Playing" runtime widget. Runs in a sandboxed iframe. It receives
+     reactive state from the host ({source:"quicktys", type:"state", state}) and
+     asks the host to run Pear actions
+     ({source:"quicktys-widget", type:"action", plugin, action, config}). -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * { box-sizing: border-box; }
+      /* Match the app's dark widget card (iframes paint white by default). */
+      html, body { margin: 0; height: 100%; background: #1e1e1e; }
+      body {
+        font-family: system-ui, sans-serif;
+        color: #eee;
+        display: flex;
+        gap: 0.9rem;
+        align-items: center;
+        padding: 0.9rem 1rem;
+      }
+      #cover {
+        width: 72px; height: 72px; flex: 0 0 auto;
+        border-radius: 8px;
+        background: #2a2a2a center / cover no-repeat; border: 1px solid #333;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.6rem; color: #555;
+      }
+      .body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+      #title { font-weight: 700; font-size: 0.98rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      #artist { opacity: 0.7; font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .ctrls { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.4rem; }
+      button {
+        border: none; cursor: pointer; color: #eee;
+        background: #2b2b2b; border-radius: 999px;
+        width: 30px; height: 30px;
+        display: inline-flex; align-items: center; justify-content: center;
+      }
+      button:hover { background: #3a3a3a; }
+      button svg { width: 15px; height: 15px; display: block; }
+      #toggle { width: 38px; height: 38px; background: #7ec27e; color: #123; }
+      #toggle svg { width: 18px; height: 18px; }
+      #toggle:hover { background: #93d093; }
+    </style>
+  </head>
+  <body>
+    <div id="cover">♪</div>
+    <div class="body">
+      <div id="title">—</div>
+      <div id="artist"></div>
+      <div class="ctrls">
+        <button id="prev" title="Previous"></button>
+        <button id="toggle" title="Play / Pause"></button>
+        <button id="next" title="Next"></button>
+      </div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      // SVG icons (consistent sizing, unlike the ⏵/⏸ unicode glyphs).
+      const ICON = {
+        play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+        pause: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>',
+        prev: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 6h2v12H7zm3.5 6L19 18V6z"/></svg>',
+        next: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M15 6h2v12h-2zM5 6v12l8.5-6z"/></svg>',
+      };
+      let playing = false;
+      let state = {};
+
+      function act(action) {
+        parent.postMessage(
+          { source: "quicktys-widget", type: "action", plugin: "pear", action, config: {} },
+          "*",
+        );
+      }
+      $("prev").innerHTML = ICON.prev;
+      $("next").innerHTML = ICON.next;
+      $("prev").onclick = () => act("previous");
+      $("next").onclick = () => act("next");
+      $("toggle").onclick = () => {
+        playing = !playing; // optimistic; corrected by the next state sync
+        paint();
+        act("toggle");
+      };
+
+      function paint() {
+        $("title").textContent = state["pear.title"] || "—";
+        $("artist").textContent = state["pear.artist"] || "";
+        const cover = state["pear.cover"];
+        const el = $("cover");
+        if (cover) {
+          el.style.backgroundImage = `url("${cover.replace(/"/g, "%22")}")`;
+          el.textContent = "";
+        } else {
+          el.style.backgroundImage = "";
+          el.textContent = "♪";
+        }
+        $("toggle").innerHTML = playing ? ICON.pause : ICON.play;
+      }
+
+      window.addEventListener("message", (e) => {
+        const d = e.data;
+        if (!d || d.source !== "quicktys") return;
+        if (d.type === "state") {
+          state = d.state || {};
+          if ("pear.playing" in state) playing = !!state["pear.playing"];
+          paint();
+        }
+      });
+
+      // Ask the host for the current state once we're ready.
+      parent.postMessage({ source: "quicktys-widget", type: "ready" }, "*");
+      paint();
+    </script>
+  </body>
+</html>

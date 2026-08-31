@@ -1,0 +1,35 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Quicktys",
+  "version": "0.1.0",
+  "identifier": "app.mordica.quicktys",
+  "build": {
+    "frontendDist": "../../frontend/dist",
+    "beforeBuildCommand": "npm --prefix ../../frontend run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Quicktys",
+        "width": 1280,
+        "height": 800
+      }
+    ],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self' 'unsafe-inline'",
+        "style-src": "'self' 'unsafe-inline'",
+        "font-src": "'self' data:",
+        "img-src": "'self' data: blob: http://127.0.0.1:26538 http://localhost:26538 https://*.googleusercontent.com https://*.ytimg.com https://*.ggpht.com",
+        "media-src": "'self' data: blob: http://127.0.0.1:26538 http://localhost:26538",
+        "connect-src": "'self' ipc: http://ipc.localhost http://127.0.0.1:26538 ws://127.0.0.1:26538",
+        "frame-src": "'self' widget: pluginui: moduleui:"
+      }
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": []
+  }
+}

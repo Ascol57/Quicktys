@@ -1,0 +1,9 @@
+{
+  "name": "Bouton",
+  "description": "Un bouton cliquable qui émet un event à lier à une automation.",
+  "config": {
+    "label": "Libellé",
+    "icon": "Icône (classe pi/mdi)",
+    "color": "Couleur"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "id": "pear-now-playing",
+  "kind": "widget",
+  "name": "Now Playing (Pear)",
+  "icon": "pi pi-play-circle",
+  "runtime": "html",
+  "entry": "index.html",
+  "requires": ["pear"],
+  "config": { "type": "Object", "properties": {} }
+}

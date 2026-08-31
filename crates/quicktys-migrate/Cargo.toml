@@ -1,0 +1,21 @@
+[package]
+name = "quicktys-migrate"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# Best-effort CastMate → Quicktys migrator (M8). Reads a user's *CastMate data*
+# (their YAML resources — allowed under the clean-room rule; it is the user's
+# data, not CastMate code) and emits Quicktys resources + a migration report.
+
+[[bin]]
+name = "quicktys-migrate"
+path = "src/main.rs"
+
+[dependencies]
+quicktys-core.workspace = true
+quicktys-schema.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+anyhow.workspace = true

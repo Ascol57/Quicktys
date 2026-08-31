@@ -1,0 +1,303 @@
+<!doctype html>
+<!-- Overlay editor — the `webview` module's contributed page (M-view). Runs in a
+     sandboxed ViewFrame; talks to ITS OWN module services through the host bridge
+     (postMessage). Composes browser-source overlays: runtime widgets freely
+     positioned/sized in PERCENTAGES on a fixed-aspect canvas, rendered identically
+     at any OBS output resolution. Copy the /overlay/<id> URL into an OBS Browser
+     source. (Editor shows labeled boxes, not live widget previews; OBS renders
+     the real widgets.) -->
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Overlays</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, sans-serif; background: #141414; color: #e6e6e6; height: 100vh; display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: .5rem; padding: .7rem 1rem; border-bottom: 1px solid #262626; flex-wrap: wrap; }
+  header h2 { margin: 0 .5rem 0 0; font-size: 1.15rem; }
+  select, input, button { font: inherit; color: inherit; }
+  select, input[type=text] { background: #1c1c1c; border: 1px solid #333; border-radius: 6px; padding: .35rem .5rem; }
+  input#name { width: 15rem; }
+  .btn { background: #262626; border: 1px solid #333; border-radius: 6px; padding: .35rem .6rem; cursor: pointer; display: inline-flex; align-items: center; gap: .35rem; }
+  .btn:hover { background: #303030; }
+  .btn.primary { background: #3a5; border-color: #3a5; color: #06210f; font-weight: 600; }
+  .btn.danger { color: #e5827a; }
+  .spacer { flex: 1; }
+  .seg { display: inline-flex; border: 1px solid #333; border-radius: 6px; overflow: hidden; }
+  .seg button { background: #1c1c1c; border: 0; padding: .35rem .6rem; cursor: pointer; }
+  .seg button.on { background: #3a5; color: #06210f; font-weight: 600; }
+  .url { display: inline-flex; align-items: center; gap: .3rem; font-size: .78rem; color: #9a9a9a; background: #191919; border: 1px solid #2a2a2a; border-radius: 6px; padding: .1rem .2rem .1rem .55rem; }
+  .url code { color: #cfcfcf; }
+  .url button { background: none; border: 0; color: #bbb; cursor: pointer; padding: .1rem .3rem; }
+  main { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 1rem; container-type: size; }
+  .canvas { position: relative; background: #000; box-shadow: 0 0 0 1px #333, 0 8px 30px rgba(0,0,0,.5); overflow: hidden; }
+  .canvas.landscape { aspect-ratio: 16/9; width: min(100cqw, calc(100cqh * 16 / 9)); }
+  .canvas.portrait { aspect-ratio: 9/16; height: min(100cqh, calc(100cqw * 9 / 16)); }
+  .hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #555; font-size: .85rem; pointer-events: none; text-align: center; padding: 1rem; }
+  .node { position: absolute; border: 1px dashed rgba(126,194,126,.55); background: rgba(126,194,126,.07); display: flex; align-items: center; justify-content: center; }
+  .node .lbl { font-size: .8rem; color: #bfe0bf; pointer-events: none; padding: .2rem; text-align: center; overflow: hidden; }
+  .node .move { position: absolute; top: -1.5rem; left: 0; background: #1c1c1c; border: 1px solid #333; border-radius: 5px; padding: .05rem .35rem; font-size: .72rem; display: flex; gap: .3rem; align-items: center; white-space: nowrap; cursor: move; }
+  .node .move .rm { cursor: pointer; color: #e5827a; }
+  .node .rz { position: absolute; right: -4px; bottom: -4px; width: 14px; height: 14px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 45%, #7ec27e 45%); }
+  .empty { display: flex; flex-direction: column; align-items: center; gap: .6rem; opacity: .65; }
+  .empty .big { font-size: 2.4rem; }
+  .pal { position: fixed; background: #1c1c1c; border: 1px solid #333; border-radius: 8px; padding: .3rem; min-width: 12rem; box-shadow: 0 10px 30px rgba(0,0,0,.5); z-index: 20; }
+  .pal button { display: block; width: 100%; text-align: left; background: none; border: 0; color: #eee; padding: .4rem .5rem; border-radius: 5px; cursor: pointer; }
+  .pal button:hover { background: #2c2c2c; }
+  .pal .none { opacity: .5; padding: .5rem; font-size: .85rem; }
+</style>
+
+<header>
+  <h2 id="t-title">Overlays</h2>
+  <select id="overlaySel"></select>
+  <button class="btn" id="newBtn">＋ <span id="t-new">New</span></button>
+  <input type="text" id="name" placeholder="Overlay name" style="display:none" />
+  <div class="spacer"></div>
+  <div id="editTools" style="display:none">
+    <span class="seg" id="aspect">
+      <button data-a="16:9">16:9</button>
+      <button data-a="9:16">9:16</button>
+    </span>
+    <button class="btn" id="addBtn">＋ <span id="t-add">Add widget</span></button>
+    <span class="url" title="Add this as a Browser source in OBS">
+      <code id="url"></code>
+      <button id="copyBtn" title="Copy URL">⧉</button>
+    </span>
+    <button class="btn danger" id="delBtn" title="Delete overlay">🗑</button>
+  </div>
+</header>
+
+<main>
+  <div id="stage" class="empty">
+    <div class="big">🖥</div>
+    <p id="t-none">No overlays yet.</p>
+    <button class="btn primary" id="newBtn2"><span id="t-new2">New overlay</span></button>
+  </div>
+</main>
+
+<script>
+  // ---- host bridge (request/response over postMessage) --------------------
+  const parentWin = window.parent;
+  let reqSeq = 0;
+  const pending = new Map();
+  function send(msg) { parentWin.postMessage({ source: "quicktys-view", ...msg }, "*"); }
+  function call(service, args = {}) {
+    const reqId = ++reqSeq;
+    send({ type: "call", reqId, service, args });
+    return new Promise((resolve, reject) => pending.set(reqId, { resolve, reject }));
+  }
+  const copy = (text) => send({ type: "copy", text });
+
+  // ---- tiny i18n ----------------------------------------------------------
+  const STR = {
+    en: { title: "Overlays", new: "New", add: "Add widget", none: "No overlays yet.", new2: "New overlay",
+          untitled: "New overlay", hint: "Add a widget, then drag to place and resize it.", nomatch: "No widgets", del: "Delete this overlay?" },
+    fr: { title: "Overlays", new: "Nouveau", add: "Ajouter un widget", none: "Aucun overlay.", new2: "Nouvel overlay",
+          untitled: "Nouvel overlay", hint: "Ajoutez un widget, puis glissez pour le placer et le redimensionner.", nomatch: "Aucun widget", del: "Supprimer cet overlay ?" },
+  };
+  let S = STR.en;
+
+  // ---- state --------------------------------------------------------------
+  let catalog = [];          // widget bundles
+  let overlays = [];         // [{id,name,aspect,widgets:[...]}]
+  let currentId = null;
+  const SERVER_PORT = 8787;  // mirrors webserver::DEFAULT_PORT
+
+  const current = () => overlays.find((o) => o.id === currentId) || null;
+  const overlayWidgets = () => catalog.filter((w) => !w.template); // runtime widgets only
+  const newId = (p) => p + "-" + Math.random().toString(36).slice(2, 8);
+  const widgetName = (type) => catalog.find((w) => w.id === type)?.name || type;
+
+  async function reload() {
+    overlays = (await call("list-overlays")) || [];
+    if (!overlays.some((o) => o.id === currentId)) currentId = overlays[0]?.id ?? null;
+    render();
+  }
+
+  // Debounced persistence of the current overlay.
+  let saveTimer = null;
+  function save() {
+    const o = current();
+    if (!o) return;
+    clearTimeout(saveTimer);
+    const snap = JSON.parse(JSON.stringify(o));
+    saveTimer = setTimeout(() => call("upsert-overlay", snap), 250);
+  }
+
+  // ---- overlay CRUD -------------------------------------------------------
+  async function createOverlay() {
+    const o = { id: newId("ov"), name: S.untitled, aspect: "16:9", widgets: [] };
+    await call("upsert-overlay", o);
+    currentId = o.id;
+    await reload();
+  }
+  async function deleteOverlay() {
+    const o = current();
+    if (!o || !confirm(S.del)) return;
+    await call("delete-overlay", { id: o.id });
+    currentId = null;
+    await reload();
+  }
+  function defaultConfig(w) {
+    const cfg = {};
+    for (const [k, s] of Object.entries(w.config?.properties ?? {})) {
+      if (s.default !== undefined) cfg[k] = s.default;
+      else if (Array.isArray(s.enum)) cfg[k] = s.enum[0];
+      else { const t = String(s.type || "").toLowerCase(); cfg[k] = t === "boolean" ? true : (t === "number" || t === "integer") ? 0 : ""; }
+    }
+    return cfg;
+  }
+  function addWidget(type) {
+    const w = catalog.find((x) => x.id === type);
+    const o = current();
+    if (!w || !o) return;
+    o.widgets.push({ id: newId("w"), type: w.id, x: 5, y: 5, w: 40, h: 25, config: defaultConfig(w) });
+    save(); render();
+  }
+  function removeWidget(id) {
+    const o = current();
+    if (!o) return;
+    o.widgets = o.widgets.filter((w) => w.id !== id);
+    save(); render();
+  }
+
+  // ---- drag / resize (percentages of the canvas) --------------------------
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  let drag = null, resize = null;
+  function startMove(e, w, rect) { drag = { w, x: e.clientX, y: e.clientY, sx: w.x, sy: w.y, rect }; bindDrag(); }
+  function startResize(e, w, rect) { resize = { w, x: e.clientX, y: e.clientY, sw: w.w, sh: w.h, rect }; bindDrag(); }
+  function bindDrag() { window.addEventListener("mousemove", onDrag); window.addEventListener("mouseup", endDrag); }
+  function onDrag(e) {
+    if (drag) {
+      const dx = ((e.clientX - drag.x) / drag.rect.width) * 100, dy = ((e.clientY - drag.y) / drag.rect.height) * 100;
+      drag.w.x = clamp(Math.round(drag.sx + dx), 0, 100 - drag.w.w);
+      drag.w.y = clamp(Math.round(drag.sy + dy), 0, 100 - drag.w.h);
+      positionNode(drag.w);
+    } else if (resize) {
+      const dw = ((e.clientX - resize.x) / resize.rect.width) * 100, dh = ((e.clientY - resize.y) / resize.rect.height) * 100;
+      resize.w.w = clamp(Math.round(resize.sw + dw), 5, 100 - resize.w.x);
+      resize.w.h = clamp(Math.round(resize.sh + dh), 5, 100 - resize.w.y);
+      positionNode(resize.w);
+    }
+  }
+  function endDrag() {
+    window.removeEventListener("mousemove", onDrag); window.removeEventListener("mouseup", endDrag);
+    if (drag || resize) save();
+    drag = resize = null;
+  }
+  function positionNode(w) {
+    const el = document.getElementById("node-" + w.id);
+    if (el) { el.style.left = w.x + "%"; el.style.top = w.y + "%"; el.style.width = w.w + "%"; el.style.height = w.h + "%"; }
+  }
+
+  // ---- add-widget palette -------------------------------------------------
+  function openPalette(anchor) {
+    closePalette();
+    const pal = document.createElement("div");
+    pal.className = "pal"; pal.id = "palette";
+    const items = overlayWidgets();
+    if (!items.length) { const d = document.createElement("div"); d.className = "none"; d.textContent = S.nomatch; pal.appendChild(d); }
+    for (const w of items) {
+      const b = document.createElement("button");
+      b.textContent = w.name || w.id;
+      b.onclick = () => { addWidget(w.id); closePalette(); };
+      pal.appendChild(b);
+    }
+    document.body.appendChild(pal);
+    const r = anchor.getBoundingClientRect();
+    pal.style.left = Math.min(r.left, window.innerWidth - pal.offsetWidth - 8) + "px";
+    pal.style.top = r.bottom + 4 + "px";
+    setTimeout(() => document.addEventListener("mousedown", onDocDown), 0);
+  }
+  function onDocDown(e) { if (!e.target.closest("#palette") && e.target.id !== "addBtn") closePalette(); }
+  function closePalette() { document.getElementById("palette")?.remove(); document.removeEventListener("mousedown", onDocDown); }
+
+  // ---- render -------------------------------------------------------------
+  const $ = (id) => document.getElementById(id);
+  function render() {
+    // Overlay selector
+    const sel = $("overlaySel");
+    sel.innerHTML = "";
+    sel.style.display = overlays.length ? "" : "none";
+    for (const o of overlays) {
+      const opt = document.createElement("option");
+      opt.value = o.id; opt.textContent = o.name || o.id; if (o.id === currentId) opt.selected = true;
+      sel.appendChild(opt);
+    }
+    const o = current();
+    $("name").style.display = o ? "" : "none";
+    $("editTools").style.display = o ? "" : "none";
+    if (o) {
+      $("name").value = o.name || "";
+      $("url").textContent = `http://localhost:${SERVER_PORT}/overlay/${o.id}`;
+      for (const b of $("aspect").querySelectorAll("button")) b.classList.toggle("on", b.dataset.a === (o.aspect || "16:9"));
+    }
+    renderStage();
+  }
+  function renderStage() {
+    const stage = $("stage");
+    const o = current();
+    if (!o) {
+      stage.className = "empty";
+      stage.innerHTML = `<div class="big">🖥</div><p>${S.none}</p><button class="btn primary" id="newBtn2b">${S.new2}</button>`;
+      $("newBtn2b").onclick = createOverlay;
+      return;
+    }
+    stage.className = "";
+    const canvas = document.createElement("div");
+    canvas.className = "canvas " + (o.aspect === "9:16" ? "portrait" : "landscape");
+    if (!o.widgets.length) {
+      const h = document.createElement("p"); h.className = "hint"; h.textContent = S.hint; canvas.appendChild(h);
+    }
+    for (const w of o.widgets) {
+      const node = document.createElement("div");
+      node.className = "node"; node.id = "node-" + w.id;
+      node.style.cssText = `left:${w.x}%;top:${w.y}%;width:${w.w}%;height:${w.h}%`;
+      const lbl = document.createElement("div"); lbl.className = "lbl"; lbl.textContent = widgetName(w.type); node.appendChild(lbl);
+      const mv = document.createElement("div"); mv.className = "move";
+      mv.innerHTML = `<span>⠿ ${widgetName(w.type)}</span><span class="rm" title="Remove">✕</span>`;
+      mv.onmousedown = (e) => { if (e.target.classList.contains("rm")) return; e.preventDefault(); startMove(e, w, canvas.getBoundingClientRect()); };
+      mv.querySelector(".rm").onclick = (e) => { e.stopPropagation(); removeWidget(w.id); };
+      node.appendChild(mv);
+      const rz = document.createElement("div"); rz.className = "rz";
+      rz.onmousedown = (e) => { e.preventDefault(); startResize(e, w, canvas.getBoundingClientRect()); };
+      node.appendChild(rz);
+      canvas.appendChild(node);
+    }
+    stage.innerHTML = ""; stage.appendChild(canvas);
+  }
+
+  // ---- wire up static controls -------------------------------------------
+  $("newBtn").onclick = createOverlay;
+  $("newBtn2").onclick = createOverlay;
+  $("delBtn").onclick = deleteOverlay;
+  $("addBtn").onclick = (e) => openPalette(e.currentTarget);
+  $("copyBtn").onclick = () => { const o = current(); if (o) copy(`http://localhost:${SERVER_PORT}/overlay/${o.id}`); };
+  $("overlaySel").onchange = (e) => { currentId = e.target.value; render(); };
+  $("name").oninput = (e) => { const o = current(); if (o) { o.name = e.target.value; save(); const opt = [...$("overlaySel").options].find((x) => x.value === o.id); if (opt) opt.textContent = o.name || o.id; } };
+  for (const b of $("aspect").querySelectorAll("button")) b.onclick = () => { const o = current(); if (o) { o.aspect = b.dataset.a; save(); render(); } };
+
+  // ---- bridge messages ----------------------------------------------------
+  window.addEventListener("message", (e) => {
+    const d = e.data;
+    if (!d || d.source !== "quicktys") return;
+    if (d.type === "init") {
+      catalog = d.widgets || [];
+      S = STR[d.locale] || STR.en;
+      applyStrings();
+      reload();
+    } else if (d.type === "result") {
+      const p = pending.get(d.reqId);
+      if (!p) return;
+      pending.delete(d.reqId);
+      d.ok ? p.resolve(d.value) : p.reject(new Error(d.error || "call failed"));
+    }
+  });
+  function applyStrings() {
+    $("t-title").textContent = S.title; $("t-new").textContent = S.new; $("t-new2").textContent = S.new2;
+    $("t-add").textContent = S.add; $("t-none").textContent = S.none;
+  }
+
+  // Tell the host we're ready → it replies with `init`.
+  send({ type: "ready" });
+</script>

@@ -1,0 +1,12 @@
+{
+  "id": "pear-queue",
+  "kind": "widget",
+  "name": "Queue (Pear)",
+  "icon": "pi pi-list",
+  "runtime": "html",
+  "entry": "index.html",
+  "requires": ["pear"],
+  "defaultW": 2,
+  "defaultH": 3,
+  "config": { "type": "Object", "properties": {} }
+}

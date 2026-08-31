@@ -1,0 +1,20 @@
+{
+  "name": "Discord",
+  "description": "Envoie des messages sur Discord via un webhook entrant.",
+  "fields": {
+    "url": "URL du webhook",
+    "content": "Message",
+    "username": "Nom d'utilisateur (optionnel)",
+    "avatar": "URL de l'avatar (optionnel)"
+  },
+  "actions": {
+    "webhook": {
+      "name": "Envoyer un message webhook"
+    }
+  },
+  "triggers": {},
+  "state": {},
+  "settings": {
+    "webhook": "URL de webhook par défaut"
+  }
+}

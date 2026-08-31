@@ -1,0 +1,20 @@
+{
+  "name": "Twitch",
+  "description": "Send chat messages and announcements to your Twitch channel.",
+  "actions": {
+    "chat": {
+      "name": "Send chat message",
+      "config": { "message": { "label": "Message" } }
+    },
+    "announce": {
+      "name": "Announce",
+      "config": {
+        "message": { "label": "Message" },
+        "color": { "label": "Color" }
+      }
+    }
+  },
+  "triggers": {},
+  "state": {},
+  "settings": {}
+}

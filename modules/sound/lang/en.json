@@ -1,0 +1,1 @@
+{ "name": "Sound", "description": "Plays audio files through the host.", "services": { "play": { "name": "Play sound" } } }

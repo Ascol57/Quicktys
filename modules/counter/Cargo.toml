@@ -1,0 +1,20 @@
+# Self-contained reference MODULE used to validate the two-tier ABI end to end.
+# Built separately for wasm32-wasip2:
+#   (cd modules/counter && cargo build --target wasm32-wasip2 --release)
+[package]
+name = "counter"
+version = "0.1.0"
+edition = "2021"
+# Reference extension: proprietary, source-available, (C) Ascol57 — third-party
+# extensions may pick any licence (Extension Exception). See LICENSE-EXTENSIONS.
+license = "LicenseRef-Ascol57-Proprietary"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+quicktys-module-sdk = { path = "../../crates/quicktys-module-sdk" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Pinned (see plugins/time): newer 0.5x needs the unstable `wasip2` std feature.
+wit-bindgen = "=0.36.0"

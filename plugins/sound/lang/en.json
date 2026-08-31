@@ -1,0 +1,1 @@
+{"name": "Sound", "description": "Play a sound file.", "fields": {"file": "Sound file", "volume": "Volume (%)", "text": "Text to speak", "voice": "Voice / language"}, "actions": {"play": {"name": "Play sound"}, "tts": {"name": "Text to speech"}}, "triggers": {}, "state": {}, "settings": {}}

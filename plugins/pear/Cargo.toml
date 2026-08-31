@@ -1,0 +1,19 @@
+# PLUGIN: Pear Desktop controls (Play/Pause/Next/… actions). Consumes the
+# certified `pear` module for the actual network I/O.
+#   (cd plugins/pear && cargo build --target wasm32-wasip2 --release)
+[package]
+name = "pear-plugin"
+version = "0.1.0"
+edition = "2021"
+# Reference extension: proprietary, source-available, (C) Ascol57 — third-party
+# extensions may pick any licence (Extension Exception). See LICENSE-EXTENSIONS.
+license = "LicenseRef-Ascol57-Proprietary"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+quicktys-plugin-sdk = { path = "../../crates/quicktys-plugin-sdk" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+wit-bindgen = "=0.36.0"

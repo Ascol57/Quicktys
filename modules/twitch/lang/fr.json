@@ -1,0 +1,12 @@
+{
+  "name": "Twitch",
+  "description": "Pilote certifié pour l'API Helix de Twitch (chat, annonces, infos de stream).",
+  "services": {
+    "set-auth": { "name": "Définir l'authentification" },
+    "set-base-url": { "name": "Définir l'URL de l'API" },
+    "send-chat": { "name": "Envoyer un message" },
+    "announce": { "name": "Annoncer" },
+    "get-stream": { "name": "Infos du stream" },
+    "helix": { "name": "Requête Helix" }
+  }
+}

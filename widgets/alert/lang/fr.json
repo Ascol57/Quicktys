@@ -1,0 +1,13 @@
+{
+  "name": "Alerte",
+  "description": "Une boîte d'alerte déclenchée par son nom depuis l'action Alertes (titre, contenu, image).",
+  "config": {
+    "name": "Nom de l'alerte",
+    "duration": "Durée (ms)",
+    "bgColor": "Fond",
+    "titleColor": "Couleur du titre",
+    "contentColor": "Couleur du contenu",
+    "accentColor": "Accent",
+    "radius": "Arrondi des coins"
+  }
+}

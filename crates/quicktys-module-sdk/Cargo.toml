@@ -1,0 +1,13 @@
+[package]
+name = "quicktys-module-sdk"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Guest-side SDK for writing Quicktys MODULES (certified drivers) as WASM components."
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+# Reused pure schema model (see plugin SDK). `wit_bindgen::generate!` runs in the
+# module crate itself (via `define_module!`), so the SDK does not depend on it.
+quicktys-schema = { path = "../quicktys-schema" }

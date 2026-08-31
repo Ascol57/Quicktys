@@ -1,0 +1,22 @@
+# Demo plugin scaffold. Built separately from the host workspace for the
+# `wasm32-wasip2` target:  cargo build -p time --target wasm32-wasip2 --release
+# The resulting component is what the host loads at runtime.
+[package]
+name = "time"
+version = "0.1.0"
+edition = "2021"
+# Reference extension: proprietary, source-available, (C) Ascol57 — third-party
+# extensions may pick any licence (Extension Exception). See LICENSE-EXTENSIONS.
+license = "LicenseRef-Ascol57-Proprietary"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+quicktys-plugin-sdk = { path = "../../crates/quicktys-plugin-sdk" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# `generate!` runs here (in the cdylib) so the component export shims land in
+# this crate. Pinned to 0.36 (matches the host's wasmtime 27); newer 0.5x pulls
+# crates that need the unstable `wasip2` std feature and won't build on stable.
+wit-bindgen = "=0.36.0"

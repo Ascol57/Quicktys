@@ -1,0 +1,24 @@
+{
+  "id": "alert",
+  "kind": "widget",
+  "name": "Alert",
+  "icon": "pi pi-bell",
+  "runtime": "html",
+  "entry": "index.html",
+  "preview": "preview.html",
+  "requires": ["alert"],
+  "defaultW": 2,
+  "defaultH": 2,
+  "config": {
+    "type": "Object",
+    "properties": {
+      "name": { "type": "String", "default": "alert" },
+      "duration": { "type": "Number", "default": 5000, "min": 500, "max": 60000, "step": 500 },
+      "bgColor": { "type": "Color", "default": "#1e1e1e" },
+      "titleColor": { "type": "Color", "default": "#ffffff" },
+      "contentColor": { "type": "Color", "default": "#c8c8c8" },
+      "accentColor": { "type": "Color", "default": "#d3695f" },
+      "radius": { "type": "Number", "default": 14, "min": 0, "max": 60 }
+    }
+  }
+}

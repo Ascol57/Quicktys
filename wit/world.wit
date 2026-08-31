@@ -1,0 +1,81 @@
+package quicktys:api@0.2.0;
+
+// Quicktys extension worlds — the two tiers of extension.
+//
+// See host.wit for the imported capability interfaces, and ARCHITECTURE.md
+// §"Modèle d'extension à deux étages" for the trust model.
+
+// ===========================================================================
+// PLUGIN — user-facing logic. Anyone can write one. Fully sandboxed.
+// Provides actions / triggers / state / settings; consumes module services.
+// ===========================================================================
+interface plugin-guest {
+    variant invoke-error { aborted, failed(string) }
+
+    // Manifest JSON: id, name, version, icon, color, the declared
+    // actions/triggers/state/settings/secrets WITH their schemas, AND the list
+    // of REQUIRED MODULES (id + semver). The host uses it to build the UI,
+    // validate payloads, and resolve module dependencies at install time.
+    init: func() -> string;
+
+    on-load: func() -> result<_, string>;
+    on-unload: func();
+
+    // Run an action (host has validated config/context against the schemas).
+    invoke-action: func(action-id: string, config-json: string, context-json: string) -> result<string, invoke-error>;
+
+    on-settings-changed: func(settings-json: string);
+
+    // Delivery of a module event the plugin subscribed to (via host `modules`).
+    on-module-event: func(module-id: string, event-id: string, payload-json: string);
+}
+
+world plugin {
+    import logging;
+    import storage;
+    import reactivity;
+    import modules;
+    export plugin-guest;
+}
+
+// ===========================================================================
+// MODULE — a driver / protocol adapter ("how to talk to OBS/Twitch/audio/...").
+// Only CERTIFIED developers may publish one. Granted SYSTEM capabilities.
+// Exposes typed services + events; consumed by plugins.
+// ===========================================================================
+interface module-guest {
+    // Manifest JSON: id, name, version, the declared SERVICE METHODS and EVENTS
+    // WITH their schemas, the settings/secrets, AND the list of REQUIRED SYSTEM
+    // CAPABILITIES (net, input, audio, hid, files, process, timers) shown to the
+    // user at install time.
+    init: func() -> string;
+
+    on-load: func() -> result<_, string>;
+    on-unload: func();
+
+    // A plugin called one of this module's service methods (validated by host).
+    call: func(method: string, args-json: string) -> result<string, string>;
+
+    on-settings-changed: func(settings-json: string);
+
+    // Low-level event from a host capability the module owns (socket data,
+    // timer tick, HID report, OAuth callback, ...). The module turns these into
+    // high-level service events via `events.emit-event`.
+    on-host-event: func(event-id: string, payload-json: string);
+}
+
+world module {
+    import logging;
+    import storage;
+    import events;
+    import oauth;   // core facilitation; provider env comes from the module
+    // System capabilities — certified modules only.
+    import net;
+    import input;
+    import audio;
+    import hid;
+    import files;
+    import process;
+    import timers;
+    export module-guest;
+}

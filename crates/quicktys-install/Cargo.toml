@@ -1,0 +1,17 @@
+[package]
+name = "quicktys-install"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+quicktys-pkg.workspace = true
+quicktys-cert.workspace = true
+quicktys-crypto.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+# Build real signed packages in tests (CA → publisher → release chain).
+quicktys-crypto.workspace = true

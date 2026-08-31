@@ -1,0 +1,138 @@
+                       QUICKTYS EXTENSION EXCEPTION
+                              Version 1.0
+
+  Copyright (C) 2026 Ascol57. Everyone is permitted to copy and distribute
+  verbatim copies of this Exception document, but changing it is not allowed.
+
+This Exception is an additional permission under section 7 of the GNU Affero
+General Public License, version 3 ("AGPL"), granted by the copyright holder of
+Quicktys. It supplements, and does not replace, the AGPL: except as expressly
+permitted below, every term of the AGPL applies unchanged.
+
+
+0. DEFINITIONS
+
+"The Program" means Quicktys, the core application and its libraries, as
+distributed by the copyright holder under the AGPL — including but not limited
+to the host crates, the desktop application, the built-in frontend, and any
+modified version of any of them.
+
+"Official Extension ABI" means the published, documented interface through
+which the Program communicates with extensions, namely:
+
+  (a) the WIT contracts distributed with the Program in the `wit/` directory
+      (WebAssembly Component Model package `quicktys:api`), and any bindings
+      mechanically generated from them;
+  (b) the guest SDK crates `quicktys-plugin-sdk` and `quicktys-module-sdk`,
+      whose purpose is to be linked into extensions;
+  (c) the host <-> WebView IPC command and event catalogue;
+  (d) the widget bridge — the local HTTP/WebSocket transport, the custom
+      `widget://` URI scheme, and the documented `postMessage` protocol;
+  (e) the manifest, bundle, schema and `lang/` file formats consumed by the
+      Program.
+
+"Independent Extension" means a plugin, module, widget, theme, or comparable
+add-on that:
+
+  (a) interacts with the Program solely through the Official Extension ABI; and
+  (b) contains no source code of the Program, other than material that is part
+      of the Official Extension ABI as defined above; and
+  (c) is not itself a modified version of the Program.
+
+Communicating through the Official Extension ABI includes being loaded,
+sandboxed, and invoked by the Program at runtime as a WebAssembly component, or
+being rendered by the Program as a widget.
+
+
+1. GRANT OF ADDITIONAL PERMISSION
+
+As a special exception, you have permission to develop, use, distribute, sell,
+and license an Independent Extension under terms of your own choosing —
+including proprietary, closed-source, and commercial terms — without that
+Extension becoming subject to the AGPL, and without it being deemed a work
+based on the Program for the purposes of the AGPL.
+
+This permission applies regardless of whether the Independent Extension is
+distributed separately from the Program or alongside it, and regardless of
+whether it is combined with the Program in memory at runtime.
+
+You may also convey the Official Extension ABI material listed in section 0(a)
+and 0(b), as incorporated into your Independent Extension, under the terms of
+that Extension.
+
+
+2. SCOPE AND LIMITS
+
+This Exception grants no permission with respect to the Program itself. In
+particular:
+
+  (a) Any modified version of the Program remains fully governed by the AGPL.
+      Modifying the Program's implementation of the Official Extension ABI does
+      not bring the result within this Exception.
+
+  (b) AGPL section 13 continues to apply in full. If you modify the Program and
+      make it available to users over a network — including as a hosted
+      service, a marketplace, or a remote-control backend — you must offer
+      those users the Corresponding Source of your modified Program. Shipping
+      proprietary Independent Extensions with it does not relieve you of that
+      obligation.
+
+  (c) Conveying the Program, modified or unmodified, together with Independent
+      Extensions does not change the licensing of the Program: the Program part
+      of that distribution remains under the AGPL, and its Corresponding Source
+      must be offered as the AGPL requires.
+
+  (d) If an Independent Extension ceases to satisfy the definition in section 0
+      — for example, by incorporating Program source code that is not part of
+      the Official Extension ABI, or by circumventing the ABI to reach internal
+      Program functionality — this Exception does not apply to it, and the AGPL
+      applies to it in full.
+
+  (e) This Exception grants no rights in any trademark, service mark, or trade
+      name of the copyright holder, including "Quicktys". Nothing here
+      authorises you to present a derivative work as the official product.
+
+  (f) This Exception does not limit the copyright holder's right to license the
+      Program to others under different terms, including commercial terms.
+
+
+3. NO WARRANTY
+
+This Exception is provided under the same disclaimer of warranty and limitation
+of liability as the Program (AGPL sections 15 to 17).
+
+
+4. STANDARD APPLICATION NOTICE
+
+Source files of the Program should carry a notice such as:
+
+    Copyright (C) 2026 Ascol57
+
+    This file is part of Quicktys.
+
+    Quicktys is free software: you can redistribute it and/or modify it under
+    the terms of the GNU Affero General Public License as published by the Free
+    Software Foundation, version 3, with the Quicktys Extension Exception
+    (see the LICENSE-EXCEPTION file distributed with this program).
+
+    Quicktys is distributed in the hope that it will be useful, but WITHOUT ANY
+    WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+    FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License for
+    more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+The SPDX expression for such files is:
+
+    AGPL-3.0-only WITH quicktys-extension-exception
+
+Note that this is a custom exception identifier, not a registered SPDX license
+exception; tooling that validates SPDX identifiers strictly may reject it.
+
+
+-------------------------------------------------------------------------------
+This text is a drafting proposal, not legal advice. It has not been reviewed by
+a lawyer. Per ARCHITECTURE.md section 0bis, the final wording of this Exception
+and of the accompanying CLA must be drafted or validated by qualified counsel
+before the project is relied upon commercially.

@@ -1,0 +1,33 @@
+{
+  "name": "Aléatoire",
+  "description": "Dés, nombres, pile ou face, probabilité et tirage aléatoire.",
+  "actions": {
+    "number": {
+      "name": "Nombre aléatoire",
+      "config": {
+        "min": { "label": "Minimum" },
+        "max": { "label": "Maximum" },
+        "integer": { "label": "Nombre entier" }
+      }
+    },
+    "dice": {
+      "name": "Lancer des dés",
+      "config": {
+        "count": { "label": "Nombre de dés" },
+        "sides": { "label": "Faces par dé" }
+      }
+    },
+    "coin": { "name": "Pile ou face", "config": {} },
+    "chance": {
+      "name": "Probabilité",
+      "config": { "percent": { "label": "Chance (%)" } }
+    },
+    "pick": {
+      "name": "Tirer dans une liste",
+      "config": { "items": { "label": "Éléments" } }
+    }
+  },
+  "triggers": {},
+  "state": {},
+  "settings": {}
+}

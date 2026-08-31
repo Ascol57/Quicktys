@@ -1,0 +1,165 @@
+<!doctype html>
+<!-- Pear "Queue" runtime widget: the current play queue with cover art, the
+     playing track highlighted. Receives `pear.queue` (list of
+     {title, artist, thumbnail, videoId}) via the host state bridge. -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * { box-sizing: border-box; }
+      /* Match the app's dark widget card (iframes paint white by default). */
+      html, body { margin: 0; height: 100%; background: #1e1e1e; }
+      body {
+        font-family: system-ui, sans-serif;
+        color: #eee;
+        display: flex;
+        flex-direction: column;
+      }
+      .head {
+        display: flex; align-items: center; gap: 0.45rem;
+        padding: 0.6rem 0.8rem 0.4rem;
+        font-weight: 700; font-size: 0.9rem;
+      }
+      .head .count { margin-left: auto; opacity: 0.5; font-weight: 500; font-size: 0.8rem; }
+      #list { flex: 1; overflow-y: auto; padding: 0 0.4rem 0.5rem; }
+      .row {
+        display: flex; align-items: center; gap: 0.6rem;
+        padding: 0.35rem 0.4rem; border-radius: 7px;
+        border-left: 3px solid transparent; cursor: pointer;
+      }
+      .row + .row { margin-top: 2px; }
+      .row:not(.current):hover { background: #262626; }
+      .row.current { background: color-mix(in srgb, #7ec27e 16%, #1e1e1e); border-left-color: #7ec27e; }
+      .thumb {
+        width: 40px; height: 40px; flex: 0 0 auto; border-radius: 5px;
+        background: #2a2a2a center / cover no-repeat; border: 1px solid #333;
+        display: flex; align-items: center; justify-content: center; color: #555; font-size: 1rem;
+      }
+      .meta { min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+      .title { font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .row.current .title { font-weight: 700; }
+      .artist { font-size: 0.74rem; opacity: 0.65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .eq { margin-left: auto; color: #7ec27e; padding-left: 0.3rem; display: inline-flex; align-items: center; }
+      .empty { opacity: 0.5; text-align: center; padding: 1.5rem 0.5rem; font-size: 0.85rem; }
+    </style>
+  </head>
+  <body>
+    <div class="head"><span>Queue</span><span class="count" id="count"></span></div>
+    <div id="list"><div class="empty">—</div></div>
+
+    <script>
+      let state = {};
+      // Indicator shown on the current row (SVG — Unicode glyphs render unevenly).
+      const PLAY_SVG =
+        '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+      const PAUSE_SVG =
+        '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M6 5h3.5v14H6zM14.5 5H18v14h-3.5z"/></svg>';
+      const esc = (s) =>
+        String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+      function tracks() {
+        const q = state["pear.queue"];
+        if (Array.isArray(q) && q.length) return q;
+        // Fallback: titles only, from pear.playlist.
+        const p = state["pear.playlist"];
+        return Array.isArray(p) ? p.map((t) => ({ title: t })) : [];
+      }
+      function isCurrent(t) {
+        if (typeof t.selected === "boolean") return t.selected;
+        const vid = state["pear.video-id"];
+        if (vid && t.videoId) return t.videoId === vid;
+        return t.title && t.title === state["pear.title"];
+      }
+
+      function paint() {
+        const list = tracks();
+        const paused = state["pear.playing"] === false;
+        document.getElementById("count").textContent = list.length ? list.length : "";
+        const el = document.getElementById("list");
+        if (!list.length) {
+          el.innerHTML = '<div class="empty">Queue is empty</div>';
+          return;
+        }
+        el.innerHTML = list
+          .map((t, i) => {
+            const cur = isCurrent(t);
+            const thumb = t.thumbnail
+              ? `style="background-image:url('${esc(t.thumbnail).replace(/'/g, "%27")}')"`
+              : "";
+            const inner = t.thumbnail ? "" : "♪";
+            const artist = t.artist ? `<span class="artist">${esc(t.artist)}</span>` : "";
+            return `<div class="row${cur ? " current" : ""}" data-i="${i}">
+              <div class="thumb" ${thumb}>${inner}</div>
+              <div class="meta"><span class="title">${esc(t.title || "—")}</span>${artist}</div>
+              ${cur ? `<span class="eq">${paused ? PLAY_SVG : PAUSE_SVG}</span>` : ""}
+            </div>`;
+          })
+          .join("");
+      }
+
+      function act(action, config) {
+        parent.postMessage(
+          { source: "quicktys-widget", type: "action", plugin: "pear", action, config: config || {} },
+          "*",
+        );
+      }
+
+      // Click a track → jump to it; click the *current* track → toggle play/pause.
+      document.getElementById("list").addEventListener("click", (e) => {
+        const row = e.target.closest(".row");
+        if (!row) return;
+        if (row.classList.contains("current")) act("toggle");
+        else act("set-queue-index", { index: Number(row.dataset.i) });
+      });
+
+      // Scroll the current track to the top of the list.
+      function recenter(smooth) {
+        const cur = document.querySelector(".row.current");
+        if (cur) cur.scrollIntoView({ block: "start", behavior: smooth ? "smooth" : "auto" });
+      }
+      // After 5s of no interaction, re-stick the current track to the top.
+      let idle;
+      function scheduleRecenter() {
+        clearTimeout(idle);
+        idle = setTimeout(() => recenter(true), 5000);
+      }
+      ["wheel", "touchstart", "pointerdown", "keydown"].forEach((ev) =>
+        document.addEventListener(ev, scheduleRecenter, { passive: true }),
+      );
+
+      let stuck = false;
+      let lastCurrent = null;
+      // Identity of the currently-playing track (not its position — state now
+      // ticks every second with playback time, which must NOT trigger a scroll).
+      const currentKey = () =>
+        document.querySelector(".row.current")
+          ? state["pear.video-id"] || state["pear.title"] || null
+          : null;
+
+      window.addEventListener("message", (e) => {
+        const d = e.data;
+        if (!d || d.source !== "quicktys") return;
+        if (d.type === "state") {
+          state = d.state || {};
+          paint();
+          const key = currentKey();
+          if (!stuck) {
+            // Stick only once a real queue (with a current track) has arrived —
+            // the first state messages may carry no queue yet.
+            if (key) {
+              stuck = true;
+              lastCurrent = key;
+              requestAnimationFrame(() => recenter(false));
+            }
+          } else if (key && key !== lastCurrent) {
+            // Only re-stick when the track actually changes.
+            lastCurrent = key;
+            requestAnimationFrame(() => recenter(true));
+          }
+        }
+      });
+      parent.postMessage({ source: "quicktys-widget", type: "ready" }, "*");
+      paint();
+    </script>
+  </body>
+</html>

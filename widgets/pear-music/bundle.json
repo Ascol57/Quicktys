@@ -1,0 +1,29 @@
+{
+  "id": "pear-music",
+  "kind": "widget",
+  "name": "Music (Pear)",
+  "icon": "pi pi-headphones",
+  "runtime": "html",
+  "entry": "index.html",
+  "requires": ["pear"],
+  "defaultW": 2,
+  "defaultH": 1,
+  "config": {
+    "type": "Object",
+    "properties": {
+      "showCover": { "type": "Boolean", "default": true },
+      "showTitle": { "type": "Boolean", "default": true },
+      "showArtists": { "type": "Boolean", "default": true },
+      "showProgress": { "type": "Boolean", "default": true },
+      "showTime": { "type": "Boolean", "default": true },
+      "bgColor": { "type": "Color", "default": "#1e1e1e" },
+      "titleColor": { "type": "Color", "default": "#ffffff" },
+      "artistColor": { "type": "Color", "default": "#a0a0a0" },
+      "accentColor": { "type": "Color", "default": "#7ec27e" },
+      "barColor": { "type": "Color", "default": "#3a3a3a" },
+      "radius": { "type": "Number", "default": 12, "min": 0, "max": 60 },
+      "coverRadius": { "type": "Number", "default": 8, "min": 0, "max": 60 },
+      "titleSize": { "type": "Number", "default": 15, "min": 8, "max": 48 }
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Core + event permissions for the main window. Application commands (list_plugins, run_automation, ...) are allowed by default.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

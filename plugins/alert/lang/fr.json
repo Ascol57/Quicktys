@@ -1,0 +1,18 @@
+{
+  "name": "Alertes",
+  "description": "Déclenche une boîte d'alerte nommée (titre, contenu, image) sur un overlay.",
+  "actions": {
+    "show": {
+      "name": "Afficher une alerte",
+      "config": {
+        "name": "Alerte",
+        "title": "Titre",
+        "content": "Contenu",
+        "image": "URL de l'image"
+      }
+    }
+  },
+  "triggers": {},
+  "state": {},
+  "settings": {}
+}

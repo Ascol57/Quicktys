@@ -1,0 +1,14 @@
+{
+  "name": "Time",
+  "description": "Delays and timers for sequences.",
+  "actions": {
+    "delay": {
+      "name": "Delay",
+      "description": "Wait for a duration before continuing.",
+      "config": { "duration": { "label": "Duration" } }
+    }
+  },
+  "triggers": {},
+  "state": {},
+  "settings": {}
+}

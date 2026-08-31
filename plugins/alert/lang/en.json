@@ -1,0 +1,18 @@
+{
+  "name": "Alerts",
+  "description": "Fire a named alert box (title, content, image) on an overlay.",
+  "actions": {
+    "show": {
+      "name": "Show alert",
+      "config": {
+        "name": "Alert",
+        "title": "Title",
+        "content": "Content",
+        "image": "Image URL"
+      }
+    }
+  },
+  "triggers": {},
+  "state": {},
+  "settings": {}
+}

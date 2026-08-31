@@ -1,0 +1,23 @@
+[package]
+name = "quicktys-pack"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "quicktys-pack"
+path = "src/main.rs"
+
+[dependencies]
+# Reads each built component's real `init()` manifest (requires/capabilities) to
+# synthesize a pkg `manifest.json` — the packaging step `dist/bundles` → pkg sources.
+quicktys-host.workspace = true
+quicktys-core.workspace = true
+# Sign packages with a dev CA (`--sign`) so marketplace-installed modules can be
+# certified (and thus granted system caps) when the app pins the CA key.
+quicktys-crypto.workspace = true
+quicktys-cert.workspace = true
+quicktys-pkg.workspace = true
+quicktys-install.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true

@@ -1,0 +1,14 @@
+{
+  "name": "Temps",
+  "description": "Délais et minuteurs pour les séquences.",
+  "actions": {
+    "delay": {
+      "name": "Délai",
+      "description": "Attendre une durée avant de continuer.",
+      "config": { "duration": { "label": "Durée" } }
+    }
+  },
+  "triggers": {},
+  "state": {},
+  "settings": {}
+}

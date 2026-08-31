@@ -1,0 +1,33 @@
+# Cargo build dirs — the host workspace at the root, plus each excluded WASM
+# extension which builds in its own nested target/ (e.g. plugins/time/target).
+/target
+**/target/
+**/*.rs.bk
+
+# NOTE: Cargo.lock is deliberately NOT ignored — this workspace ships a binary
+# (quicktys-app), so the lockfile is committed for reproducible builds.
+
+# Frontend (once vendored)
+**/node_modules/
+/frontend/dist
+
+# Built plugin/module components
+*.wasm
+
+# Tauri-generated schemas (regenerated on build)
+/crates/quicktys-app/gen/schemas
+
+# Local user data
+/user
+/installed
+
+# Distributed build artifacts
+/dist
+
+# Tooling / editor / OS noise
+.claude/settings.local.json
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

@@ -1,0 +1,16 @@
+[package]
+name = "quicktys-pkg"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+# Package archive: a deterministic tar (zeroed metadata, sorted entries) so a
+# bundle dir reproduces byte-for-byte, wrapped in zstd. `content_hash` is the
+# sha256 of the produced `.qtpkg`.
+tar = "0.4"
+zstd = "0.13"
+sha2 = "0.10"

@@ -1,0 +1,1 @@
+{ "name": "Operating System", "description": "Run shell commands and open files/URLs.", "fields": { "command": "Command", "target": "File or URL" }, "actions": { "shell": {"name":"Run command"}, "open": {"name":"Open file / URL"} }, "triggers":{}, "state":{}, "settings":{} }

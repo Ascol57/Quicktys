@@ -1,0 +1,9 @@
+{
+  "name": "Button",
+  "description": "A clickable button that fires an event you bind to an automation.",
+  "config": {
+    "label": "Label",
+    "icon": "Icon (pi/mdi class)",
+    "color": "Color"
+  }
+}

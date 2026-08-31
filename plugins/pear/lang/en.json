@@ -1,0 +1,46 @@
+{
+  "name": "Pear Desktop",
+  "description": "Control the Pear Desktop music player.",
+  "actions": {
+    "play": { "name": "Play" },
+    "pause": { "name": "Pause" },
+    "toggle": { "name": "Play / Pause" },
+    "next": { "name": "Next track" },
+    "previous": { "name": "Previous track" },
+    "like": { "name": "Like" },
+    "dislike": { "name": "Dislike" },
+    "toggle-mute": { "name": "Toggle mute" },
+    "shuffle": { "name": "Shuffle" },
+    "set-volume": {
+      "name": "Set volume",
+      "config": { "volume": { "label": "Volume" } }
+    },
+    "seek-to": {
+      "name": "Seek to",
+      "config": { "seconds": { "label": "Seconds" } }
+    }
+  },
+  "triggers": {
+    "song-changed": {
+      "name": "Song changed",
+      "description": "Fires when the playing song changes.",
+      "context": {
+        "title": { "label": "Title" },
+        "artist": { "label": "Artist" },
+        "videoId": { "label": "Video id" }
+      }
+    }
+  },
+  "state": {
+    "title": { "name": "Title" },
+    "artist": { "name": "Artist" },
+    "artists": { "name": "Artists" },
+    "cover": { "name": "Cover image" },
+    "url": { "name": "URL" },
+    "album": { "name": "Album" },
+    "video-id": { "name": "Video id" },
+    "lyrics": { "name": "Lyrics" },
+    "playlist": { "name": "Playlist" }
+  },
+  "settings": {}
+}

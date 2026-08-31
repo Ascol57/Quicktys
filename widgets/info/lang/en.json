@@ -1,0 +1,4 @@
+{
+  "name": "Info box",
+  "description": "A box showing a count for a chosen source (plugins, profiles, …)."
+}

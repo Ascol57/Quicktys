@@ -1,0 +1,17 @@
+{
+  "name": "Notify",
+  "description": "Write a log line or show a toast.",
+  "actions": {
+    "log": {
+      "name": "Log text",
+      "config": { "message": { "label": "Message" }, "level": { "label": "Level" } }
+    },
+    "toast": {
+      "name": "Show toast",
+      "config": { "message": { "label": "Message" }, "level": { "label": "Level" } }
+    }
+  },
+  "triggers": {},
+  "state": {},
+  "settings": {}
+}

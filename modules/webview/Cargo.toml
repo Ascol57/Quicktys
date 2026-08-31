@@ -1,0 +1,20 @@
+# `webview` module — owns overlay definitions (the core webserver queries it to
+# serve browser sources). Frontend-facing data only (storage cap), no system
+# caps → uncertified. Built for wasm32-wasip2:
+#   cargo build -p webview-module --target wasm32-wasip2 --release
+[package]
+name = "webview-module"
+version = "0.1.0"
+edition = "2021"
+# Reference extension: proprietary, source-available, (C) Ascol57 — third-party
+# extensions may pick any licence (Extension Exception). See LICENSE-EXTENSIONS.
+license = "LicenseRef-Ascol57-Proprietary"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+quicktys-module-sdk = { path = "../../crates/quicktys-module-sdk" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+wit-bindgen = "=0.36.0"

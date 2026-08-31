@@ -1,0 +1,46 @@
+{
+  "name": "Pear Desktop",
+  "description": "Contrôler le lecteur de musique Pear Desktop.",
+  "actions": {
+    "play": { "name": "Lecture" },
+    "pause": { "name": "Pause" },
+    "toggle": { "name": "Lecture / Pause" },
+    "next": { "name": "Piste suivante" },
+    "previous": { "name": "Piste précédente" },
+    "like": { "name": "J'aime" },
+    "dislike": { "name": "Je n'aime pas" },
+    "toggle-mute": { "name": "Couper le son" },
+    "shuffle": { "name": "Aléatoire" },
+    "set-volume": {
+      "name": "Régler le volume",
+      "config": { "volume": { "label": "Volume" } }
+    },
+    "seek-to": {
+      "name": "Aller à",
+      "config": { "seconds": { "label": "Secondes" } }
+    }
+  },
+  "triggers": {
+    "song-changed": {
+      "name": "Changement de musique",
+      "description": "Se déclenche quand la musique en cours change.",
+      "context": {
+        "title": { "label": "Titre" },
+        "artist": { "label": "Artiste" },
+        "videoId": { "label": "Id vidéo" }
+      }
+    }
+  },
+  "state": {
+    "title": { "name": "Titre" },
+    "artist": { "name": "Artiste" },
+    "artists": { "name": "Artistes" },
+    "cover": { "name": "Pochette" },
+    "url": { "name": "URL" },
+    "album": { "name": "Album" },
+    "video-id": { "name": "Id vidéo" },
+    "lyrics": { "name": "Paroles" },
+    "playlist": { "name": "Playlist" }
+  },
+  "settings": {}
+}

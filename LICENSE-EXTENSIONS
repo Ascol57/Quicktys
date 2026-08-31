@@ -1,0 +1,103 @@
+                    QUICKTYS REFERENCE EXTENSIONS LICENCE
+                      Proprietary — source-available
+                              Version 1.0
+
+  Copyright (C) 2026 Ascol57. All rights reserved.
+
+
+1. WHAT THIS COVERS
+
+This licence governs the extensions distributed in this repository under the
+directories `plugins/`, `modules/` and `widgets/`, including their source code,
+manifests, configuration schemas, `lang/` translation files, HTML/CSS/JS assets
+and icons (collectively, "the Extensions").
+
+It does NOT cover the Quicktys core, which is licensed separately under the GNU
+Affero General Public License version 3 with the Quicktys Extension Exception.
+See the LICENSE, LICENSE-EXCEPTION and COPYING.md files at the root of this
+repository.
+
+SPDX identifier used in the Extensions' manifests:
+
+    LicenseRef-Ascol57-Proprietary
+
+
+2. RESERVATION OF RIGHTS
+
+The Extensions are proprietary works of Ascol57. They are published in a public
+repository for reference, transparency, review and interoperability purposes
+only.
+
+Publication does not place the Extensions in the public domain, and does not
+grant any licence by implication, estoppel or otherwise. All rights not
+expressly granted in section 3 are reserved.
+
+In particular, and except as permitted by section 3 or by mandatory law, you
+may NOT:
+
+  (a) copy, reproduce or redistribute the Extensions, in source or compiled
+      form, in whole or in substantial part;
+  (b) modify the Extensions, or create derivative works based on them;
+  (c) sell, licence, sublicence, rent, or otherwise commercially exploit the
+      Extensions;
+  (d) incorporate the Extensions, in whole or in substantial part, into another
+      product, extension, marketplace listing or distribution;
+  (e) remove or alter any copyright, authorship or licence notice they carry.
+
+
+3. PERMITTED USES
+
+You are permitted, free of charge, to:
+
+  (a) view, read and study the source of the Extensions;
+  (b) download this repository and build the Extensions in order to run them
+      with the Quicktys core as an end user, on machines you own or control;
+  (c) run them for local development and testing of the Quicktys core itself,
+      including the automated test suite, which loads several of them as
+      fixtures;
+  (d) make private modifications for your own testing, provided you do not
+      distribute the result;
+  (e) submit the modification back to the copyright holder as a contribution
+      (see section 4);
+  (f) quote short excerpts for commentary, review, teaching or bug reports, with
+      attribution.
+
+These permissions are personal and non-transferable, and end automatically if
+you breach section 2.
+
+The Extensions are also reference material for the extension API. Nothing in
+this licence prevents you from studying how they call the Official Extension
+ABI and writing your own independent extension against that same public ABI —
+the API is public and is covered by the Quicktys Extension Exception. What you
+may not do is reuse this code to do it.
+
+
+4. CONTRIBUTIONS
+
+Contributions to the Extensions are accepted only under the project's
+Contributor Licence Agreement (ARCHITECTURE.md section 0bis). By submitting a
+contribution you assign or licence it to the copyright holder, who remains the
+sole owner of the Extensions and may relicense them, including commercially.
+
+
+5. SEPARATE COMMERCIAL TERMS
+
+The copyright holder may grant broader rights — including reuse, redistribution
+or relicensing of any Extension — under a separate written agreement. Requests
+should be directed to the copyright holder.
+
+
+6. NO WARRANTY
+
+THE EXTENSIONS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE EXTENSIONS OR THE USE OR OTHER DEALINGS IN THEM.
+
+
+-------------------------------------------------------------------------------
+This text is a drafting proposal, not legal advice. It has not been reviewed by
+a lawyer. Per ARCHITECTURE.md section 0bis, the final wording must be drafted or
+validated by qualified counsel before being relied upon commercially.

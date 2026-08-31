@@ -1,0 +1,10 @@
+{
+  "name": "Webview",
+  "description": "Owns overlay definitions served as OBS browser sources.",
+  "services": {
+    "list-overlays": { "name": "List overlays" },
+    "get-overlay": { "name": "Get overlay" },
+    "upsert-overlay": { "name": "Save overlay" },
+    "delete-overlay": { "name": "Delete overlay" }
+  }
+}
