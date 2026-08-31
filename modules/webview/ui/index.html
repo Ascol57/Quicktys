@@ -45,6 +45,22 @@
   .pal button { display: block; width: 100%; text-align: left; background: none; border: 0; color: #eee; padding: .4rem .5rem; border-radius: 5px; cursor: pointer; }
   .pal button:hover { background: #2c2c2c; }
   .pal .none { opacity: .5; padding: .5rem; font-size: .85rem; }
+  /* Per-widget settings panel (same schema fields as the dashboard's form). */
+  .cfg { position: fixed; z-index: 30; width: 19rem; max-height: 72vh; overflow: auto; background: #1c1c1c; border: 1px solid #333; border-radius: 8px; padding: .6rem .7rem; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+  .cfg h3 { margin: 0 0 .55rem; font-size: .9rem; display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+  .cfg h3 .x { cursor: pointer; color: #999; font-weight: 400; }
+  .cfg .row { display: flex; flex-direction: column; gap: .25rem; margin-bottom: .55rem; }
+  .cfg .row.inline { flex-direction: row; align-items: center; justify-content: space-between; }
+  .cfg .lbl2 { font-size: .78rem; opacity: .75; }
+  .cfg select, .cfg input[type=text], .cfg input[type=number] { width: 100%; }
+  .cfg input[type=color] { width: 2.1rem; height: 1.8rem; padding: 0; background: none; border: 1px solid #333; border-radius: 5px; cursor: pointer; }
+  .cfg .colorrow { display: flex; gap: .4rem; align-items: center; }
+  .cfg .colorrow input[type=text] { flex: 1; min-width: 0; }
+  .cfg .rangerow { display: flex; gap: .5rem; align-items: center; }
+  .cfg input[type=range] { flex: 1; }
+  .cfg .val { font-variant-numeric: tabular-nums; opacity: .8; font-size: .78rem; min-width: 2.6rem; text-align: right; }
+  .cfg .none { opacity: .5; font-size: .85rem; padding: .2rem 0 .4rem; }
+  .node .move .cg { cursor: pointer; color: #9fc9e8; }
 </style>
 
 <header>
@@ -91,9 +107,11 @@
   // ---- tiny i18n ----------------------------------------------------------
   const STR = {
     en: { title: "Overlays", new: "New", add: "Add widget", none: "No overlays yet.", new2: "New overlay",
-          untitled: "New overlay", hint: "Add a widget, then drag to place and resize it.", nomatch: "No widgets", del: "Delete this overlay?" },
+          untitled: "New overlay", hint: "Add a widget, then drag to place and resize it.", nomatch: "No widgets", del: "Delete this overlay?",
+          settings: "Settings", nosettings: "This widget has no settings." },
     fr: { title: "Overlays", new: "Nouveau", add: "Ajouter un widget", none: "Aucun overlay.", new2: "Nouvel overlay",
-          untitled: "Nouvel overlay", hint: "Ajoutez un widget, puis glissez pour le placer et le redimensionner.", nomatch: "Aucun widget", del: "Supprimer cet overlay ?" },
+          untitled: "Nouvel overlay", hint: "Ajoutez un widget, puis glissez pour le placer et le redimensionner.", nomatch: "Aucun widget", del: "Supprimer cet overlay ?",
+          settings: "Réglages", nosettings: "Ce widget n'a pas de réglages." },
   };
   let S = STR.en;
 
@@ -106,7 +124,10 @@
   const current = () => overlays.find((o) => o.id === currentId) || null;
   const overlayWidgets = () => catalog.filter((w) => !w.template); // runtime widgets only
   const newId = (p) => p + "-" + Math.random().toString(36).slice(2, 8);
-  const widgetName = (type) => catalog.find((w) => w.id === type)?.name || type;
+  const bundleOf = (type) => catalog.find((w) => w.id === type) || null;
+  // `label` is the translated name the host resolves for us (manifests ship i18n
+  // keys, and this sandboxed page has no access to the app's i18n).
+  const widgetName = (type) => { const b = bundleOf(type); return b?.label || b?.name || type; };
 
   async function reload() {
     overlays = (await call("list-overlays")) || [];
@@ -212,6 +233,128 @@
   function onDocDown(e) { if (!e.target.closest("#palette") && e.target.id !== "addBtn") closePalette(); }
   function closePalette() { document.getElementById("palette")?.remove(); document.removeEventListener("mousedown", onDocDown); }
 
+  // ---- per-widget settings -------------------------------------------------
+  // Mirrors the dashboard's WidgetConfigForm: the control is inferred from the
+  // widget's declared config schema, and the labels come translated from the
+  // host (manifests ship i18n keys; this sandboxed page has no i18n of its own).
+  function fieldKind(s) {
+    if (Array.isArray(s.enum)) return "enum";
+    const t = String(s.type || "").toLowerCase();
+    if (t === "boolean" || t === "toggle") return "boolean";
+    if (t === "color") return "color";
+    if ((t === "number" || t === "integer") && s.min != null && s.max != null) return "range";
+    if (t === "number" || t === "integer") return "number";
+    return "text";
+  }
+
+  function configRow(bundle, key, schema, w) {
+    const kind = fieldKind(schema);
+    const row = document.createElement("div");
+    row.className = "row" + (kind === "boolean" ? " inline" : "");
+    const label = document.createElement("label");
+    label.className = "lbl2";
+    label.textContent = bundle?.configLabels?.[key] || key;
+    row.appendChild(label);
+
+    const cur = w.config[key];
+    const set = (v) => { w.config[key] = v; save(); };
+
+    if (kind === "boolean") {
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      // Unset means ON — the same reading the widgets themselves use.
+      input.checked = cur !== false;
+      input.onchange = () => set(input.checked);
+      row.appendChild(input);
+    } else if (kind === "enum") {
+      const sel = document.createElement("select");
+      for (const v of schema.enum) {
+        const opt = document.createElement("option");
+        opt.value = v;
+        opt.textContent = bundle?.optionLabels?.[key]?.[v] ?? String(v);
+        if ((cur ?? schema.default) === v) opt.selected = true;
+        sel.appendChild(opt);
+      }
+      sel.onchange = () => set(sel.value);
+      row.appendChild(sel);
+    } else if (kind === "color") {
+      const wrap = document.createElement("div"); wrap.className = "colorrow";
+      const pick = document.createElement("input"); pick.type = "color";
+      const hex = document.createElement("input"); hex.type = "text";
+      const initial = cur ?? schema.default ?? "#000000";
+      pick.value = initial; hex.value = initial;
+      pick.oninput = () => { hex.value = pick.value; set(pick.value); };
+      hex.oninput = () => { set(hex.value); if (/^#[0-9a-f]{6}$/i.test(hex.value)) pick.value = hex.value; };
+      wrap.append(pick, hex);
+      row.appendChild(wrap);
+    } else if (kind === "range") {
+      const wrap = document.createElement("div"); wrap.className = "rangerow";
+      const input = document.createElement("input");
+      input.type = "range"; input.min = schema.min; input.max = schema.max;
+      input.value = cur ?? schema.default ?? schema.min;
+      const out = document.createElement("span"); out.className = "val"; out.textContent = input.value;
+      input.oninput = () => { out.textContent = input.value; set(Number(input.value)); };
+      wrap.append(input, out);
+      row.appendChild(wrap);
+    } else if (kind === "number") {
+      const input = document.createElement("input");
+      input.type = "number";
+      if (schema.min != null) input.min = schema.min;
+      if (schema.max != null) input.max = schema.max;
+      input.value = cur ?? schema.default ?? 0;
+      input.oninput = () => set(Number(input.value));
+      row.appendChild(input);
+    } else {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = cur ?? schema.default ?? "";
+      input.oninput = () => set(input.value);
+      row.appendChild(input);
+    }
+    return row;
+  }
+
+  function openConfig(w, anchor) {
+    closeConfig();
+    const bundle = bundleOf(w.type);
+    const props = bundle?.config?.properties ?? {};
+    if (!w.config) w.config = {};
+
+    const panel = document.createElement("div");
+    panel.className = "cfg"; panel.id = "cfgPanel";
+    const head = document.createElement("h3");
+    const title = document.createElement("span");
+    title.textContent = widgetName(w.type) + " — " + S.settings;
+    const x = document.createElement("span");
+    x.className = "x"; x.textContent = "✕"; x.onclick = closeConfig;
+    head.append(title, x);
+    panel.appendChild(head);
+
+    const keys = Object.keys(props);
+    if (!keys.length) {
+      const none = document.createElement("div");
+      none.className = "none"; none.textContent = S.nosettings;
+      panel.appendChild(none);
+    }
+    for (const key of keys) panel.appendChild(configRow(bundle, key, props[key], w));
+
+    document.body.appendChild(panel);
+    const r = anchor.getBoundingClientRect();
+    panel.style.left = Math.max(8, Math.min(r.left, window.innerWidth - panel.offsetWidth - 8)) + "px";
+    panel.style.top = Math.max(8, Math.min(r.bottom + 6, window.innerHeight - panel.offsetHeight - 8)) + "px";
+    setTimeout(() => {
+      document.addEventListener("mousedown", onCfgDown);
+      document.addEventListener("keydown", onCfgKey);
+    }, 0);
+  }
+  function onCfgDown(e) { if (!e.target.closest("#cfgPanel") && !e.target.classList.contains("cg")) closeConfig(); }
+  function onCfgKey(e) { if (e.key === "Escape") closeConfig(); }
+  function closeConfig() {
+    document.getElementById("cfgPanel")?.remove();
+    document.removeEventListener("mousedown", onCfgDown);
+    document.removeEventListener("keydown", onCfgKey);
+  }
+
   // ---- render -------------------------------------------------------------
   const $ = (id) => document.getElementById(id);
   function render() {
@@ -235,6 +378,9 @@
     renderStage();
   }
   function renderStage() {
+    // The panel holds a reference to a widget object this re-render replaces
+    // (or removes) — drop it rather than leave a stale form open.
+    closeConfig();
     const stage = $("stage");
     const o = current();
     if (!o) {
@@ -255,9 +401,20 @@
       node.style.cssText = `left:${w.x}%;top:${w.y}%;width:${w.w}%;height:${w.h}%`;
       const lbl = document.createElement("div"); lbl.className = "lbl"; lbl.textContent = widgetName(w.type); node.appendChild(lbl);
       const mv = document.createElement("div"); mv.className = "move";
-      mv.innerHTML = `<span>⠿ ${widgetName(w.type)}</span><span class="rm" title="Remove">✕</span>`;
-      mv.onmousedown = (e) => { if (e.target.classList.contains("rm")) return; e.preventDefault(); startMove(e, w, canvas.getBoundingClientRect()); };
-      mv.querySelector(".rm").onclick = (e) => { e.stopPropagation(); removeWidget(w.id); };
+      const handle = document.createElement("span");
+      handle.textContent = "⠿ " + widgetName(w.type);
+      const cg = document.createElement("span");
+      cg.className = "cg"; cg.title = S.settings; cg.textContent = "⚙";
+      const rm = document.createElement("span");
+      rm.className = "rm"; rm.title = "Remove"; rm.textContent = "✕";
+      mv.append(handle, cg, rm);
+      // The bar is the drag handle, except on its two buttons.
+      mv.onmousedown = (e) => {
+        if (e.target.classList.contains("rm") || e.target.classList.contains("cg")) return;
+        e.preventDefault(); startMove(e, w, canvas.getBoundingClientRect());
+      };
+      cg.onclick = (e) => { e.stopPropagation(); openConfig(w, cg); };
+      rm.onclick = (e) => { e.stopPropagation(); removeWidget(w.id); };
       node.appendChild(mv);
       const rz = document.createElement("div"); rz.className = "rz";
       rz.onmousedown = (e) => { e.preventDefault(); startResize(e, w, canvas.getBoundingClientRect()); };

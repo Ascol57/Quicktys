@@ -11,8 +11,11 @@
                      { source:"quicktys-view", type:"open", section } -->
 <script setup>
 import { computed, inject, onMounted, onUnmounted, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { useToast } from "primevue/usetoast";
 import { ipc } from "../ipc.js";
+
+const { t, te } = useI18n();
 
 const props = defineProps({
   moduleId: { type: String, required: true },
@@ -37,8 +40,27 @@ function post(msg) {
   frame.value?.contentWindow?.postMessage(msg, "*");
 }
 
+const tr = (key, fallback) => (te(key) ? t(key) : fallback);
+
 async function sendInit() {
-  const widgets = (await ipc.listWidgets()) ?? [];
+  const raw = (await ipc.listWidgets()) ?? [];
+  // Widget manifests carry i18n KEYS, never translated strings (ARCHITECTURE
+  // §10), and a sandboxed module page has no access to the app's i18n. So
+  // resolve the display labels here: without them a view rendering a widget's
+  // settings would have to show raw schema keys (`fontFamily`, `warnAt`).
+  const widgets = raw.map((w) => {
+    const configLabels = {};
+    const optionLabels = {};
+    for (const [key, schema] of Object.entries(w.config?.properties ?? {})) {
+      configLabels[key] = tr(`widget.${w.id}.config.${key}`, key);
+      if (Array.isArray(schema.enum)) {
+        optionLabels[key] = Object.fromEntries(
+          schema.enum.map((v) => [v, tr(`widget.${w.id}.options.${key}.${v}`, String(v))]),
+        );
+      }
+    }
+    return { ...w, label: tr(`widget.${w.id}.name`, w.name || w.id), configLabels, optionLabels };
+  });
   post({ source: "quicktys", type: "init", moduleId: props.moduleId, locale: locale.value, widgets });
 }
 

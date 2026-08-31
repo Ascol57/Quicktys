@@ -65,7 +65,14 @@ in-app renderer draws it) and a `config` schema (its settings). The host does NO
 it catalogs them (scans `<root>/widgets`, loads lang namespaced `widget.<id>.*`, embeds any
 `index.html` into the manifest) and exposes the manifests via `list_widgets`. The frontend
 Dashboard (`DashboardView.vue`) is a customizable grid: add/reorder/resize/configure widgets
-(Edit mode), layout persisted in localStorage (`stores/dashboard.js`). Two widget kinds:
+(Edit mode), layout persisted in localStorage (`stores/dashboard.js`). **There are TWO places
+a widget is placed and configured** — the Dashboard, and the *overlay editor*
+(`modules/webview/ui/index.html`, the page the `webview` module contributes). They are separate
+UIs with separate code: a settings form added to one is missing from the other. The overlay
+editor's per-widget ⚙ panel renders the same schema kinds as `WidgetConfigForm.vue`; since a
+sandboxed module page has no access to the app's i18n, `ViewFrame.vue` resolves the labels
+(`widget.<id>.name`, `…config.<key>`, `…options.<key>.<value>`) and ships them in the `init`
+message as `label` / `configLabels` / `optionLabels`. Two widget kinds:
 **built-in** (`template` → an in-app Vue component, e.g. `info` → `InfoWidget.vue`, a count box
 for a chosen source) and **runtime** (ships `index.html` → rendered by `WidgetFrame.vue` in a
 **sandboxed iframe**, `sandbox="allow-scripts"`). Native loads the iframe from a custom
