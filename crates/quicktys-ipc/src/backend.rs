@@ -44,6 +44,35 @@ pub trait HostLoader: Send + Sync {
         -> Result<(), String>;
 }
 
+/// Drives the host's OAuth token store for the **interactive** part of a
+/// connection (the Device Code flow). The app implements it over `WasmHost`;
+/// `quicktys-ipc` stays host-agnostic (testable).
+///
+/// It exists because the WIT `oauth.authorize` is a *synchronous* call with
+/// nowhere to hand back a user code to display, so the interactive flow is
+/// driven from the UI side instead. The module still owns the provider
+/// specifics (ARCHITECTURE §4.6) — see [`AppBackend::oauth_connect`].
+pub trait OAuthBridge: Send + Sync {
+    /// Begin a device authorization; returns `{user_code, verification_uri,
+    /// expires_in, interval}`.
+    fn start(
+        &self,
+        provider: &str,
+        device_url: &str,
+        token_url: &str,
+        client_id: &str,
+        scopes: &str,
+    ) -> Result<Value, String>;
+    /// Poll once; returns `"pending"`, `"authorized"`, or `"failed: <why>"`.
+    fn poll(&self, provider: &str) -> Result<String, String>;
+    /// Whether a usable (or refreshable) token-set exists.
+    fn is_authorized(&self, provider: &str) -> bool;
+    /// Whether an authorization is awaiting the user's approval.
+    fn is_pending(&self, provider: &str) -> bool;
+    /// Drop the tokens and any pending authorization.
+    fn disconnect(&self, provider: &str);
+}
+
 /// The install context, injected once at boot: where to install, how to hot-load,
 /// and the pinned trust anchors that decide `certified` (M6.5).
 #[derive(Clone)]
@@ -146,6 +175,9 @@ pub struct AppBackend {
     consent: Mutex<Option<ConsentState>>,
     /// Bridge that delivers settings to a running extension (`on_settings_changed`).
     settings_applier: Mutex<Option<SettingsApplier>>,
+    /// Bridge to the host's OAuth token store, injected at boot. `None` in unit
+    /// tests → connect/poll error cleanly.
+    oauth: Mutex<Option<Arc<dyn OAuthBridge>>>,
 }
 
 impl AppBackend {
@@ -179,7 +211,87 @@ impl AppBackend {
             registry_ctx: Mutex::new(None),
             consent: Mutex::new(None),
             settings_applier: Mutex::new(None),
+            oauth: Mutex::new(None),
         }
+    }
+
+    /// Install the OAuth bridge. The app calls this once at boot over `WasmHost`.
+    pub fn set_oauth(&self, bridge: Arc<dyn OAuthBridge>) {
+        *self.oauth.lock().unwrap() = Some(bridge);
+    }
+
+    fn oauth_bridge(&self) -> Result<Arc<dyn OAuthBridge>, String> {
+        self.oauth
+            .lock()
+            .unwrap()
+            .clone()
+            .ok_or_else(|| "account connection is unavailable".to_string())
+    }
+
+    /// Start connecting an account through `module`.
+    ///
+    /// The core owns the OAuth *mechanics*, the module owns the *provider*
+    /// (ARCHITECTURE §4.6): we ask it for its `oauth-config` — endpoints, client
+    /// id, scopes — and then run the device flow ourselves. So no Twitch (or any
+    /// other provider's) specifics live in the core.
+    ///
+    /// Returns `{provider, user_code, verification_uri, expires_in, interval}`:
+    /// show the code, open the URL, then call [`oauth_poll`](Self::oauth_poll)
+    /// every `interval` seconds.
+    pub fn oauth_connect(&self, module: &str) -> Result<Value, String> {
+        let cfg = self.call_module(module, "oauth-config", serde_json::json!({}))?;
+        let field = |k: &str| {
+            cfg.get(k)
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string()
+        };
+        let provider = match field("provider") {
+            p if p.is_empty() => module.to_string(),
+            p => p,
+        };
+        let client_id = field("client_id");
+        if client_id.trim().is_empty() {
+            return Err(format!("{module}: no client id configured"));
+        }
+        let mut started = self.oauth_bridge()?.start(
+            &provider,
+            &field("device_url"),
+            &field("token_url"),
+            &client_id,
+            &field("scopes"),
+        )?;
+        if let Some(obj) = started.as_object_mut() {
+            obj.insert("provider".to_string(), Value::String(provider));
+        }
+        Ok(started)
+    }
+
+    /// Poll a pending connection once: `"pending"`, `"authorized"` or
+    /// `"failed: <why>"`.
+    pub fn oauth_poll(&self, provider: &str) -> Result<String, String> {
+        self.oauth_bridge()?.poll(provider)
+    }
+
+    /// Whether an account is connected, and whether one is being connected.
+    pub fn oauth_status(&self, provider: &str) -> Value {
+        match self.oauth_bridge() {
+            Ok(b) => serde_json::json!({
+                "provider": provider,
+                "connected": b.is_authorized(provider),
+                "pending": b.is_pending(provider),
+            }),
+            Err(_) => serde_json::json!({
+                "provider": provider, "connected": false, "pending": false,
+            }),
+        }
+    }
+
+    /// Disconnect an account (drops the tokens; the provider still has to be
+    /// told from its own site if the user wants the app revoked there).
+    pub fn oauth_disconnect(&self, provider: &str) -> Result<(), String> {
+        self.oauth_bridge()?.disconnect(provider);
+        Ok(())
     }
 
     /// Install the bridge used by [`call_module`](Self::call_module). The app

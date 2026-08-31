@@ -24,9 +24,34 @@ wit_bindgen::generate!({
 });
 
 use quicktys::api::net::{fetch, HttpRequest};
+use quicktys::api::oauth::access_token;
 use quicktys::api::storage::{kv_get, kv_set};
 
 struct Twitch;
+
+// --- OAuth (Device Code Grant) ----------------------------------------------
+//
+// Twitch's endpoints and scopes are OUR business, not the core's: the core owns
+// the OAuth mechanics and asks us for this config (ARCHITECTURE §4.6). It runs
+// the flow, stores the token-set, and refreshes it; we just read the current
+// access token back through `oauth.access-token`.
+//
+// Device Code is the only flow a distributed desktop app can honestly use here:
+// Authorization Code requires a client secret (Twitch has no PKCE) and Implicit
+// returns no refresh token.
+const DEVICE_URL: &str = "https://id.twitch.tv/oauth2/device";
+const TOKEN_URL: &str = "https://id.twitch.tv/oauth2/token";
+/// What the actions in this module actually need. Space-delimited, as Twitch
+/// wants. Keep in step with the services below — asking for more than we use is
+/// a consent smell.
+const SCOPES: &str = "user:read:chat user:write:chat user:bot channel:bot moderator:manage:announcements channel:read:subscriptions";
+
+/// The access token to authenticate Helix with: the OAuth store first (a
+/// connected account, refreshed transparently by the core), falling back to a
+/// token injected by hand through `set-auth` (self-hosters and the tests).
+fn auth_token() -> Option<String> {
+    access_token("twitch").ok().or_else(|| stored("token"))
+}
 
 /// The Helix API root. Defaults to the real host; override with `set-base-url`.
 fn base_url() -> String {
@@ -71,8 +96,8 @@ fn helix(
     query: &[(String, String)],
     body: Option<Value>,
 ) -> Result<(u16, Value), String> {
-    let token = stored("token").ok_or("twitch: not authenticated (call set-auth)")?;
-    let client_id = stored("client_id").ok_or("twitch: missing client-id (call set-auth)")?;
+    let token = auth_token().ok_or("twitch: not connected (connect the account in Settings)")?;
+    let client_id = stored("client_id").ok_or("twitch: missing client-id (set it in Settings)")?;
 
     let mut headers = vec![
         ("Authorization".to_string(), format!("Bearer {token}")),
@@ -140,6 +165,17 @@ impl Module for Twitch {
                 ("broadcaster_id".to_string(), Schema::string()),
                 ("sender_id".to_string(), Schema::string()),
             ])))
+            // The provider config the core asks for before running the device
+            // flow (it owns the mechanics, we own the Twitch specifics).
+            .service(ServiceDecl::new("oauth-config"))
+            // The registered application's client id — required both for the
+            // device flow and as Helix's `Client-Id` header.
+            .service(
+                ServiceDecl::new("set-client-id")
+                    .args(Schema::object([("client_id".to_string(), Schema::string())])),
+            )
+            // Whether we can authenticate, and how (for the Settings page).
+            .service(ServiceDecl::new("auth-status"))
             // Test/self-host override of the API root.
             .service(
                 ServiceDecl::new("set-base-url")
@@ -175,6 +211,24 @@ impl Module for Twitch {
                 }
                 Ok(Value::Null)
             }
+            "oauth-config" => Ok(quicktys_module_sdk::json!({
+                "provider": "twitch",
+                "device_url": DEVICE_URL,
+                "token_url": TOKEN_URL,
+                "client_id": stored("client_id").unwrap_or_default(),
+                "scopes": SCOPES,
+            })),
+            "set-client-id" => {
+                let id = s("client_id").ok_or("set-client-id: `client_id` is required")?;
+                kv_set("client_id", id.trim());
+                Ok(Value::Null)
+            }
+            "auth-status" => Ok(quicktys_module_sdk::json!({
+                "clientId": stored("client_id").unwrap_or_default(),
+                "hasClientId": stored("client_id").is_some(),
+                // A manually injected token counts as usable too.
+                "hasToken": auth_token().is_some(),
+            })),
             "set-base-url" => {
                 let url = s("url").ok_or("set-base-url: `url` is required")?;
                 kv_set("base_url", url.trim_end_matches('/'));

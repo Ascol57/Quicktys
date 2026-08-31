@@ -342,6 +342,30 @@ Première facilitation : **OAuth** (`interface oauth`, module-facing).
   token via `net.fetch`. Décision : **la logique Twitch reste dans le module
   twitch**, le core ne fait que lui simplifier l'auth.
 
+**Décision (août 2026) — la moitié interactive passe par l'IPC, pas par le WIT.**
+`oauth.authorize` est un appel **synchrone** : il n'a nulle part où rendre un
+code utilisateur à afficher pendant qu'on attend l'accord. Il reste donc un stub,
+et le flux interactif est piloté depuis l'UI : Settings → commandes Tauri
+`oauth_connect`/`oauth_poll`/`oauth_status`/`oauth_disconnect` → `AppBackend` →
+trait `OAuthBridge` → `WasmHost::oauth_*` → `TokenStore`. Le partage des rôles de
+§4.6 est **préservé** : le backend demande au module son service **`oauth-config`**
+(`provider`, `device_url`, `token_url`, `client_id`, `scopes`), donc aucune
+spécificité Twitch n'entre dans le cœur, et le module relit son token par
+`oauth.access-token` comme prévu.
+
+**Flux retenu : Device Code Grant**, pas Authorization Code. Twitch impose un
+**client secret** pour Authorization Code (pas de PKCE) — intenable dans un
+binaire distribué — et l'Implicit ne rend pas de refresh token. Device Code ne
+demande qu'un `client_id` **public**, rend un refresh token, et n'exige ni
+serveur loopback ni URL de redirection déclarée ; l'utilisateur peut même valider
+depuis son téléphone. L'utilisateur fournit son propre `client_id`
+(dev.twitch.tv/console/apps, type de client *public*), stocké par le module via
+`set-client-id`.
+
+⚠️ Reste à faire : le token-store est **en mémoire** — une reconnexion est
+nécessaire à chaque démarrage. Le persister (chiffré, via le trousseau de l'OS)
+est le prochain pas de cette facilitation.
+
 > Ce patron (« le core facilite, le module possède l'env et l'usage ») est le
 > modèle à suivre pour d'autres tâches transverses futures.
 

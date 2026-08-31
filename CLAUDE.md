@@ -245,8 +245,26 @@ module/plugin; needs a desktop session). OAuth is real (token store + transparen
 `src/oauth.rs`). Remaining stubs: `audio.play-buffer`, the streaming socket calls, and the other
 device caps (hid/files/timers) — wired when a driver needs them. A module reaches the system caps only if it is **certified**
 (uncertified modules that declare capabilities are refused at load — but `storage`/`logging`/
-`events` are safe and need no certification, e.g. the `webview` module). `wss`, streaming
-`ws-connect` → `on-host-event`, and the interactive browser `authorize` flow remain.
+`events` are safe and need no certification, e.g. the `webview` module). `wss` and streaming
+`ws-connect` → `on-host-event` remain.
+
+**Connecting an account — OAuth Device Code (`oauth.rs`).** The WIT `oauth.authorize` is still
+a stub **on purpose**: it is a *synchronous* call with nowhere to hand back a user code for the
+UI to display while we wait. So the interactive half runs UI-side — Settings → `oauth_connect`
+/ `oauth_poll` / `oauth_status` / `oauth_disconnect` (Tauri) → `AppBackend` → the `OAuthBridge`
+trait → `WasmHost::oauth_*` → `TokenStore::{start_device, poll_device}`. The module keeps
+owning the provider (ARCHITECTURE §4.6): the backend calls its **`oauth-config`** service for
+`{provider, device_url, token_url, client_id, scopes}`, so no Twitch specifics live in the
+core. Once tokens land, the module reads them through `oauth.access-token`, which was already
+real. **Why device code**: Twitch's Authorization Code needs a client *secret* (no PKCE), which
+cannot ship in a distributed binary, and Implicit returns no refresh token; device code needs
+only a public `client_id`, refreshes, and needs no loopback server or redirect URI. Twitch
+wants `scopes` space-delimited and URL-encoded, answers `authorization_pending` (HTTP 400)
+while waiting, and its `verification_uri` already carries the code. The user must supply a
+`client_id` from dev.twitch.tv/console/apps (public client) — `modules/twitch` stores it via
+`set-client-id` and still accepts a hand-injected token through `set-auth` (the fallback the
+tests use). Covered offline by `oauth.rs::device_flow_polls_until_authorized` /
+`device_flow_stops_on_refusal`, using `http::test_server::spawn_sequence`.
 
 Reference net-driver pattern: a **plugin can't touch the network** (safe caps only), so anything
 needing HTTP goes through a **certified module**. The generic **`http` module** (`request

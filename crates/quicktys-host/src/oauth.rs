@@ -37,6 +37,8 @@ struct ProviderEnv {
 pub struct TokenStore {
     tokens: Mutex<HashMap<String, TokenSet>>,
     providers: Mutex<HashMap<String, ProviderEnv>>,
+    /// Device authorizations currently awaiting the user's approval.
+    pending: Mutex<HashMap<String, PendingDevice>>,
 }
 
 /// The subset of a token endpoint response we consume.
@@ -47,6 +49,79 @@ struct TokenResponse {
     expires_in: Option<u64>,
     #[serde(default)]
     refresh_token: Option<String>,
+}
+
+// --- Device Code Grant ------------------------------------------------------
+//
+// The flow a desktop app can actually use. The alternatives are worse here:
+// Authorization Code needs a **client secret** (Twitch has no PKCE), which
+// cannot be shipped in a distributed binary, and Implicit returns no refresh
+// token. Device Code needs only a public `client_id`, returns a refresh token,
+// and requires no loopback server or registered redirect URI — the user can
+// even approve from their phone.
+//
+// Shape: POST the device endpoint (`client_id` + space-delimited `scopes`) for a
+// `user_code` to show and a `verification_uri` to open, then poll the token
+// endpoint until it stops answering `authorization_pending`.
+
+/// What to show the user while a device authorization is pending.
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct DeviceFlow {
+    /// The short code the user types on the provider's page.
+    pub user_code: String,
+    /// Where they type it (Twitch pre-fills the code into this URL).
+    pub verification_uri: String,
+    /// Seconds until `user_code` expires.
+    pub expires_in: u64,
+    /// Seconds the provider asks us to wait between polls.
+    pub interval: u64,
+}
+
+/// Where a device authorization stands.
+#[derive(Clone, Debug, PartialEq)]
+pub enum DeviceStatus {
+    /// The user has not approved yet — keep polling.
+    Pending,
+    /// Tokens obtained and stored.
+    Authorized,
+    /// The code expired, or the provider refused. Start over.
+    Failed(String),
+}
+
+#[derive(Deserialize)]
+struct DeviceCodeResponse {
+    device_code: String,
+    user_code: String,
+    verification_uri: String,
+    #[serde(default)]
+    expires_in: Option<u64>,
+    #[serde(default)]
+    interval: Option<u64>,
+}
+
+/// A device authorization we are polling for.
+struct PendingDevice {
+    device_code: String,
+    scopes: String,
+    expires_at: Instant,
+}
+
+const FORM: (&str, &str) = ("Content-Type", "application/x-www-form-urlencoded");
+
+/// Percent-encode a form value (RFC 3986 unreserved set kept as-is). Scopes
+/// carry `:` and are space-delimited, so they must be encoded.
+fn form_encode(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for b in value.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char)
+            }
+            b' ' => out.push_str("%20"),
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
 }
 
 impl TokenStore {
@@ -92,6 +167,134 @@ impl TokenStore {
                 expires_at: expires_in.map(|s| Instant::now() + Duration::from_secs(s)),
             },
         );
+    }
+
+    /// Begin a Device Code authorization: ask the provider for a `user_code`
+    /// to display and a URL to open, and remember the `device_code` to poll
+    /// with. Also registers the provider env, so the refresh path works once
+    /// the tokens land.
+    pub fn start_device(
+        &self,
+        provider: &str,
+        device_url: &str,
+        token_url: &str,
+        client_id: &str,
+        scopes: &str,
+    ) -> Result<DeviceFlow, String> {
+        if client_id.trim().is_empty() {
+            return Err("no client id configured".to_string());
+        }
+        self.set_provider(provider, token_url, client_id, None);
+
+        let form = format!(
+            "client_id={}&scopes={}",
+            form_encode(client_id),
+            form_encode(scopes)
+        );
+        let resp = http::request(
+            "POST",
+            device_url,
+            &[(FORM.0.into(), FORM.1.into())],
+            Some(form.as_bytes()),
+        )?;
+        if resp.status != 200 {
+            return Err(format!(
+                "device endpoint returned {}: {}",
+                resp.status,
+                String::from_utf8_lossy(&resp.body)
+            ));
+        }
+        let parsed: DeviceCodeResponse = serde_json::from_slice(&resp.body)
+            .map_err(|e| format!("bad device response: {e}"))?;
+        let expires_in = parsed.expires_in.unwrap_or(1800);
+        let interval = parsed.interval.unwrap_or(5).max(1);
+
+        self.pending.lock().unwrap().insert(
+            provider.to_string(),
+            PendingDevice {
+                device_code: parsed.device_code,
+                scopes: scopes.to_string(),
+                expires_at: Instant::now() + Duration::from_secs(expires_in),
+            },
+        );
+        Ok(DeviceFlow {
+            user_code: parsed.user_code,
+            verification_uri: parsed.verification_uri,
+            expires_in,
+            interval,
+        })
+    }
+
+    /// Poll a pending device authorization once. Call at the `interval` the
+    /// provider asked for; polling faster earns a `slow_down`.
+    pub fn poll_device(&self, provider: &str) -> Result<DeviceStatus, String> {
+        let (device_code, scopes) = {
+            let pending = self.pending.lock().unwrap();
+            let p = pending
+                .get(provider)
+                .ok_or_else(|| format!("no pending authorization for {provider}"))?;
+            if Instant::now() >= p.expires_at {
+                drop(pending);
+                self.cancel_device(provider);
+                return Ok(DeviceStatus::Failed("the code expired".to_string()));
+            }
+            (p.device_code.clone(), p.scopes.clone())
+        };
+        let (token_url, client_id) = {
+            let providers = self.providers.lock().unwrap();
+            let env = providers
+                .get(provider)
+                .ok_or_else(|| format!("no provider env for {provider}"))?;
+            (env.token_url.clone(), env.client_id.clone())
+        };
+
+        let form = format!(
+            "client_id={}&scopes={}&device_code={}&grant_type={}",
+            form_encode(&client_id),
+            form_encode(&scopes),
+            form_encode(&device_code),
+            form_encode("urn:ietf:params:oauth:grant-type:device_code")
+        );
+        let resp = http::request(
+            "POST",
+            &token_url,
+            &[(FORM.0.into(), FORM.1.into())],
+            Some(form.as_bytes()),
+        )?;
+        let body = String::from_utf8_lossy(&resp.body).to_string();
+
+        if resp.status == 200 {
+            let parsed: TokenResponse =
+                serde_json::from_slice(&resp.body).map_err(|e| format!("bad token response: {e}"))?;
+            self.seed(
+                provider,
+                &parsed.access_token,
+                parsed.refresh_token.as_deref(),
+                parsed.expires_in,
+            );
+            self.cancel_device(provider);
+            return Ok(DeviceStatus::Authorized);
+        }
+        // Not an error: the user simply has not approved yet. `slow_down` means
+        // we polled too fast — also "keep waiting".
+        if body.contains("authorization_pending") || body.contains("slow_down") {
+            return Ok(DeviceStatus::Pending);
+        }
+        self.cancel_device(provider);
+        Ok(DeviceStatus::Failed(format!(
+            "authorization refused ({}): {body}",
+            resp.status
+        )))
+    }
+
+    /// Forget a pending device authorization (user cancelled, or it failed).
+    pub fn cancel_device(&self, provider: &str) {
+        self.pending.lock().unwrap().remove(provider);
+    }
+
+    /// Whether a device authorization is awaiting approval.
+    pub fn device_pending(&self, provider: &str) -> bool {
+        self.pending.lock().unwrap().contains_key(provider)
     }
 
     /// Whether a usable (valid or refreshable) token-set exists.
@@ -213,6 +416,102 @@ mod tests {
         assert_eq!(token, "fresh-token");
         // The refreshed token is now valid and returned without re-refreshing.
         assert_eq!(store.access_token("twitch").unwrap(), "fresh-token");
+    }
+
+    /// The whole device flow offline: device code → one `authorization_pending`
+    /// → the token. Proves the polling loop stops for the right reason and that
+    /// the resulting token-set is usable (and refreshable) afterwards.
+    #[test]
+    fn device_flow_polls_until_authorized() {
+        let (base, requests) = test_server::spawn_sequence(vec![
+            (
+                200,
+                r#"{"device_code":"dev-1","user_code":"ABCD-1234","verification_uri":"https://twitch.tv/activate","expires_in":1800,"interval":5}"#
+                    .to_string(),
+            ),
+            (400, r#"{"status":400,"message":"authorization_pending"}"#.to_string()),
+            (
+                200,
+                r#"{"access_token":"user-token","refresh_token":"r-1","expires_in":3600}"#
+                    .to_string(),
+            ),
+        ]);
+        let store = TokenStore::new();
+
+        let flow = store
+            .start_device(
+                "twitch",
+                &format!("{base}/device"),
+                &format!("{base}/token"),
+                "client-123",
+                "chat:read chat:edit",
+            )
+            .unwrap();
+        assert_eq!(flow.user_code, "ABCD-1234");
+        assert_eq!(flow.interval, 5);
+        assert!(store.device_pending("twitch"));
+        assert!(!store.is_authorized("twitch"));
+
+        assert_eq!(store.poll_device("twitch").unwrap(), DeviceStatus::Pending);
+        assert_eq!(store.poll_device("twitch").unwrap(), DeviceStatus::Authorized);
+
+        assert!(!store.device_pending("twitch"), "pending cleared once authorized");
+        assert!(store.is_authorized("twitch"));
+        assert_eq!(store.access_token("twitch").unwrap(), "user-token");
+
+        // The device request carried the client id and URL-encoded scopes.
+        let device_req = requests.recv().unwrap();
+        assert!(device_req.contains("client_id=client-123"), "{device_req}");
+        assert!(
+            device_req.contains("scopes=chat%3Aread%20chat%3Aedit"),
+            "scopes must be space-delimited and URL encoded: {device_req}"
+        );
+        // The poll carried the device code and the device-code grant type.
+        let poll = requests.recv().unwrap();
+        assert!(poll.contains("device_code=dev-1"), "{poll}");
+        assert!(
+            poll.contains("grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code"),
+            "{poll}"
+        );
+    }
+
+    /// A refusal (the user pressed Deny, or the code died) must end the flow
+    /// rather than leave the UI polling forever.
+    #[test]
+    fn device_flow_stops_on_refusal() {
+        let (base, _rx) = test_server::spawn_sequence(vec![
+            (
+                200,
+                r#"{"device_code":"dev-1","user_code":"WXYZ","verification_uri":"https://twitch.tv/activate"}"#
+                    .to_string(),
+            ),
+            (400, r#"{"status":400,"message":"invalid device code"}"#.to_string()),
+        ]);
+        let store = TokenStore::new();
+        store
+            .start_device(
+                "twitch",
+                &format!("{base}/device"),
+                &format!("{base}/token"),
+                "client-123",
+                "chat:read",
+            )
+            .unwrap();
+
+        match store.poll_device("twitch").unwrap() {
+            DeviceStatus::Failed(msg) => assert!(msg.contains("invalid device code"), "{msg}"),
+            other => panic!("expected a failure, got {other:?}"),
+        }
+        assert!(!store.device_pending("twitch"), "the flow must not stay pending");
+        assert!(!store.is_authorized("twitch"));
+    }
+
+    #[test]
+    fn device_flow_needs_a_client_id() {
+        let store = TokenStore::new();
+        assert!(store
+            .start_device("twitch", "http://x/device", "http://x/token", "  ", "chat:read")
+            .is_err());
     }
 
     #[test]

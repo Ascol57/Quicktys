@@ -279,6 +279,32 @@ pub(crate) mod test_server {
         });
         (format!("http://{addr}"), rx)
     }
+
+    /// Like [`spawn`], but answers a **sequence** of `(status, body)` — needed by
+    /// anything that polls, e.g. the OAuth device flow (device code, then
+    /// `authorization_pending`, then the token).
+    pub fn spawn_sequence(
+        responses: Vec<(u16, String)>,
+    ) -> (String, mpsc::Receiver<String>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (tx, rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            for (status, body) in responses {
+                let Ok((mut stream, _)) = listener.accept() else {
+                    break;
+                };
+                let buf = read_request(&mut stream);
+                let _ = tx.send(String::from_utf8_lossy(&buf).to_string());
+                let response = format!(
+                    "HTTP/1.1 {status} X\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                let _ = stream.write_all(response.as_bytes());
+            }
+        });
+        (format!("http://{addr}"), rx)
+    }
 }
 
 #[cfg(test)]

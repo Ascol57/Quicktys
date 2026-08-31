@@ -219,6 +219,52 @@ fn load_component(
     }
 }
 
+/// Drives the host's OAuth **Device Code** flow for the Settings page.
+///
+/// The interactive half lives here rather than behind the WIT `oauth.authorize`
+/// because that call is synchronous: it has nowhere to hand back a user code for
+/// the UI to display while we wait for the approval. The module still owns the
+/// provider config (ARCHITECTURE §4.6) and reads the resulting token through
+/// `oauth.access-token` as usual.
+struct HostOAuth {
+    host: Arc<WasmHost>,
+}
+
+impl quicktys_ipc::OAuthBridge for HostOAuth {
+    fn start(
+        &self,
+        provider: &str,
+        device_url: &str,
+        token_url: &str,
+        client_id: &str,
+        scopes: &str,
+    ) -> Result<Value, String> {
+        let flow = self
+            .host
+            .oauth_start_device(provider, device_url, token_url, client_id, scopes)?;
+        serde_json::to_value(flow).map_err(|e| e.to_string())
+    }
+
+    fn poll(&self, provider: &str) -> Result<String, String> {
+        use quicktys_host::oauth::DeviceStatus;
+        Ok(match self.host.oauth_poll_device(provider)? {
+            DeviceStatus::Pending => "pending".to_string(),
+            DeviceStatus::Authorized => "authorized".to_string(),
+            DeviceStatus::Failed(why) => format!("failed: {why}"),
+        })
+    }
+
+    fn is_authorized(&self, provider: &str) -> bool {
+        self.host.oauth_is_authorized(provider)
+    }
+    fn is_pending(&self, provider: &str) -> bool {
+        self.host.oauth_device_pending(provider)
+    }
+    fn disconnect(&self, provider: &str) {
+        self.host.oauth_disconnect(provider);
+    }
+}
+
 /// Backs the registry client's HTTP transport with the host's client (M6.6).
 struct HostFetcher {
     host: Arc<WasmHost>,
@@ -307,6 +353,29 @@ fn call_module(
     args: Value,
 ) -> Result<Value, String> {
     backend.call_module(&module, &service, args)
+}
+
+/// Start connecting an account (OAuth Device Code): returns the `user_code` to
+/// show and the `verification_uri` to open.
+#[tauri::command]
+fn oauth_connect(backend: State<Arc<AppBackend>>, module: String) -> Result<Value, String> {
+    backend.oauth_connect(&module)
+}
+
+/// Poll a pending connection: `"pending"` | `"authorized"` | `"failed: …"`.
+#[tauri::command]
+fn oauth_poll(backend: State<Arc<AppBackend>>, provider: String) -> Result<String, String> {
+    backend.oauth_poll(&provider)
+}
+
+#[tauri::command]
+fn oauth_status(backend: State<Arc<AppBackend>>, provider: String) -> Value {
+    backend.oauth_status(&provider)
+}
+
+#[tauri::command]
+fn oauth_disconnect(backend: State<Arc<AppBackend>>, provider: String) -> Result<(), String> {
+    backend.oauth_disconnect(&provider)
 }
 
 #[tauri::command]
@@ -771,6 +840,9 @@ fn build_backend(app: &tauri::App) -> anyhow::Result<Arc<AppBackend>> {
         }));
     }
 
+    // Interactive account connection (OAuth device flow) for the Settings page.
+    backend.set_oauth(std::sync::Arc::new(HostOAuth { host: host.clone() }));
+
     // Deliver extension settings to their `on_settings_changed` hook.
     {
         let host = host.clone();
@@ -908,6 +980,10 @@ fn main() {
             run_sequence,
             get_state,
             call_module,
+            oauth_connect,
+            oauth_poll,
+            oauth_status,
+            oauth_disconnect,
             available_locales,
             locale_bundle,
             set_locale,

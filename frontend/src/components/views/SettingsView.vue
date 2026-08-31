@@ -1,7 +1,7 @@
 <!-- Settings. Language switching is fully functional: it loads the locale bundle
      from the host, flips vue-i18n, and tells the host to persist it. -->
 <script setup>
-import { inject, ref } from "vue";
+import { inject, onMounted, onUnmounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import Select from "primevue/select";
 import InputText from "primevue/inputtext";
@@ -10,6 +10,7 @@ import Password from "primevue/password";
 import Button from "primevue/button";
 import { useToast } from "primevue/usetoast";
 import { useSettings } from "../../stores/settings.js";
+import { ipc } from "../../ipc.js";
 
 const { t } = useI18n();
 const toast = useToast();
@@ -44,6 +45,87 @@ async function saveObs() {
   await settings.setObs(obsHost.value, obsPort.value, obsPassword.value);
   toast.add({ severity: "success", detail: t("core.settings.saved"), life: 2000 });
 }
+
+// --- Twitch account (OAuth Device Code) ------------------------------------
+// The core runs the flow; the `twitch` module supplies the endpoints, client id
+// and scopes. We show the code, open the page, and poll at the interval Twitch
+// asks for until it says authorized.
+const twitch = ref({ connected: false, clientId: "", hasToken: false });
+const twitchCode = ref(null); // { user_code, verification_uri, expires_in }
+const twitchBusy = ref(false);
+const twitchError = ref("");
+let pollTimer = null;
+
+async function refreshTwitch() {
+  const status = (await ipc.oauthStatus("twitch")) ?? {};
+  const mod = (await ipc.callModuleSafe("twitch", "auth-status", {})) ?? {};
+  twitch.value = {
+    connected: !!status.connected || !!mod.hasToken,
+    pending: !!status.pending,
+    clientId: mod.clientId ?? "",
+  };
+  twitchClientId.value = twitch.value.clientId;
+}
+const twitchClientId = ref("");
+
+async function saveTwitchClientId() {
+  await ipc.callModule("twitch", "set-client-id", { client_id: twitchClientId.value.trim() });
+  await refreshTwitch();
+  toast.add({ severity: "success", detail: t("core.settings.saved"), life: 2000 });
+}
+
+function stopPolling() {
+  clearInterval(pollTimer);
+  pollTimer = null;
+}
+
+async function connectTwitch() {
+  twitchError.value = "";
+  twitchBusy.value = true;
+  try {
+    const flow = await ipc.oauthConnect("twitch");
+    twitchCode.value = flow;
+    // Twitch's verification_uri already carries the code, so the page is
+    // pre-filled; opening it is a convenience, not a requirement — the user can
+    // approve from a phone with the code alone.
+    window.open(flow.verification_uri, "_blank");
+    stopPolling();
+    pollTimer = setInterval(pollTwitch, Math.max(1, Number(flow.interval) || 5) * 1000);
+  } catch (e) {
+    twitchError.value = String(e?.message ?? e);
+  } finally {
+    twitchBusy.value = false;
+  }
+}
+
+async function pollTwitch() {
+  try {
+    const result = await ipc.oauthPoll("twitch");
+    if (result === "pending") return;
+    stopPolling();
+    twitchCode.value = null;
+    if (result === "authorized") {
+      toast.add({ severity: "success", detail: t("core.settings.twitchConnected"), life: 3000 });
+      await refreshTwitch();
+    } else {
+      twitchError.value = String(result);
+    }
+  } catch (e) {
+    stopPolling();
+    twitchCode.value = null;
+    twitchError.value = String(e?.message ?? e);
+  }
+}
+
+async function disconnectTwitch() {
+  stopPolling();
+  twitchCode.value = null;
+  await ipc.oauthDisconnect("twitch");
+  await refreshTwitch();
+}
+
+onMounted(refreshTwitch);
+onUnmounted(stopPolling);
 
 const version = "0.1.0 · M3";
 </script>
@@ -101,6 +183,56 @@ const version = "0.1.0 · M3";
         <Button class="apply" @click="saveObs">{{ t("core.settings.apply") }}</Button>
       </div>
       <small class="muted">{{ t("core.settings.obsHint") }}</small>
+    </section>
+
+    <section class="group">
+      <h3>{{ t("core.settings.twitch") }}</h3>
+
+      <!-- Connected: nothing to do but disconnect. -->
+      <template v-if="twitch.connected">
+        <div class="row">
+          <span class="badge badge--ok"><i class="pi pi-check-circle" /> {{ t("core.settings.twitchConnected") }}</span>
+          <Button class="apply" severity="secondary" @click="disconnectTwitch">
+            {{ t("core.settings.twitchDisconnect") }}
+          </Button>
+        </div>
+      </template>
+
+      <!-- Awaiting approval: the code is the whole UI. -->
+      <template v-else-if="twitchCode">
+        <p class="muted">{{ t("core.settings.twitchEnterCode") }}</p>
+        <div class="row">
+          <code class="usercode">{{ twitchCode.user_code }}</code>
+          <a class="p-button p-button-secondary apply" :href="twitchCode.verification_uri" target="_blank">
+            {{ t("core.settings.twitchOpenPage") }}
+          </a>
+          <Button class="apply" severity="secondary" text @click="disconnectTwitch">
+            {{ t("core.settings.twitchCancel") }}
+          </Button>
+        </div>
+        <small class="muted">{{ t("core.settings.twitchWaiting") }}</small>
+      </template>
+
+      <!-- Not connected: the client id is the only prerequisite. -->
+      <template v-else>
+        <div class="row">
+          <label class="field host">
+            <span class="field__label">{{ t("core.settings.twitchClientId") }}</span>
+            <InputText v-model="twitchClientId" placeholder="abcdefg1234567" />
+          </label>
+          <Button class="apply" severity="secondary" @click="saveTwitchClientId">
+            {{ t("core.settings.apply") }}
+          </Button>
+        </div>
+        <div class="row">
+          <Button class="apply" :disabled="!twitchClientId.trim() || twitchBusy" @click="connectTwitch">
+            <i class="pi pi-twitch" />&nbsp;{{ t("core.settings.twitchConnect") }}
+          </Button>
+        </div>
+      </template>
+
+      <small v-if="twitchError" class="err">{{ twitchError }}</small>
+      <small class="muted">{{ t("core.settings.twitchHint") }}</small>
     </section>
 
     <section class="group">
@@ -177,5 +309,30 @@ const version = "0.1.0 · M3";
 .muted {
   opacity: 0.55;
   font-size: 0.85rem;
+}
+.err {
+  color: #e5827a;
+  font-size: 0.85rem;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+.badge--ok {
+  color: #7ec27e;
+}
+/* The device code is the one thing the user must read and retype. */
+.usercode {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #1c1c1c;
+  user-select: all;
 }
 </style>

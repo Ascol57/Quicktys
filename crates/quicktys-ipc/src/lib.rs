@@ -14,7 +14,7 @@
 mod backend;
 mod event;
 
-pub use backend::{AppBackend, HostLoader, ModuleInfo, PluginInfo};
+pub use backend::{AppBackend, HostLoader, ModuleInfo, OAuthBridge, PluginInfo};
 pub use event::{AppEvent, EventSink, NullSink, ResourceKind};
 
 #[cfg(test)]

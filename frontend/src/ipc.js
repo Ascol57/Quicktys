@@ -102,6 +102,12 @@ const MOCK_LOCALES = {
         title: "Settings", language: "Language",
         languageHint: "Applies immediately across the whole app.",
         appearance: "Appearance", theme: "Theme", about: "About", version: "Version",
+        twitch: "Twitch account", twitchClientId: "Client ID",
+        twitchConnect: "Connect my account", twitchConnected: "Account connected",
+        twitchDisconnect: "Disconnect", twitchCancel: "Cancel", twitchOpenPage: "Open the page",
+        twitchEnterCode: "Enter this code on Twitch to authorise Quicktys:",
+        twitchWaiting: "Waiting for your approval… this window updates on its own.",
+        twitchHint: "Register an application on dev.twitch.tv/console/apps to get a Client ID (client type: public — no secret needed).",
       },
       buttons: { group: "Buttons", clicked: "Button clicked", bind: "Bind action", edit: "Edit action", actionProfile: "Button · {label}" },
     },
@@ -148,6 +154,12 @@ const MOCK_LOCALES = {
         title: "Réglages", language: "Langue",
         languageHint: "S'applique immédiatement à toute l'application.",
         appearance: "Apparence", theme: "Thème", about: "À propos", version: "Version",
+        twitch: "Compte Twitch", twitchClientId: "Client ID",
+        twitchConnect: "Connecter mon compte", twitchConnected: "Compte connecté",
+        twitchDisconnect: "Déconnecter", twitchCancel: "Annuler", twitchOpenPage: "Ouvrir la page",
+        twitchEnterCode: "Saisis ce code sur Twitch pour autoriser Quicktys :",
+        twitchWaiting: "En attente de ta validation… cette fenêtre se met à jour toute seule.",
+        twitchHint: "Enregistre une application sur dev.twitch.tv/console/apps pour obtenir un Client ID (type de client : public — aucun secret requis).",
       },
       buttons: { group: "Boutons", clicked: "Bouton cliqué", bind: "Lier une action", edit: "Modifier l'action", actionProfile: "Bouton · {label}" },
     },
@@ -362,6 +374,13 @@ export const ipc = {
   runAutomation: (id, context) => call("run_automation", { id, context }),
   runSequence: (root) => call("run_sequence", { root }),
   callModule: (module, service, args = {}) => call("call_module", { module, service, args }),
+  // --- connecting an account (OAuth device flow) -----------------------------
+  // `oauthConnect` returns { provider, user_code, verification_uri, interval,
+  // expires_in }: show the code, open the URL, then poll every `interval`s.
+  oauthConnect: (module) => call("oauth_connect", { module }),
+  oauthPoll: (provider) => call("oauth_poll", { provider }),
+  oauthStatus: (provider) => call("oauth_status", { provider }),
+  oauthDisconnect: (provider) => call("oauth_disconnect", { provider }),
   // Tolerant variant for optional/read-only calls: a module that isn't installed
   // (e.g. `webview`, `sound`) returns null instead of rejecting, so a missing
   // extension never breaks boot or a view's mount.

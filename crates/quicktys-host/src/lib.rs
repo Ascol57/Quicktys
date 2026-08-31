@@ -30,7 +30,7 @@ mod audio;
 mod hid;
 mod http;
 mod input;
-mod oauth;
+pub mod oauth;
 mod process;
 mod ws;
 
@@ -1053,6 +1053,49 @@ impl WasmHost {
     /// Hand this to the IPC backend so the UI can list plugins.
     pub fn registry(&self) -> Arc<Mutex<ExtensionRegistry>> {
         self.world.registry.clone()
+    }
+
+    /// Begin an OAuth **Device Code** authorization for `provider`, returning the
+    /// code to show the user and where to enter it.
+    ///
+    /// This is the interactive half the WIT `oauth.authorize` cannot express: it
+    /// is a synchronous call, so it has nowhere to hand back a user code to
+    /// display while we wait. The core therefore drives the flow from the UI
+    /// side (Settings → IPC → here), while the module keeps supplying the
+    /// provider specifics (ARCHITECTURE §4.6) through its own service. Once the
+    /// tokens land, the module reads them through `oauth.access-token` as usual.
+    pub fn oauth_start_device(
+        &self,
+        provider: &str,
+        device_url: &str,
+        token_url: &str,
+        client_id: &str,
+        scopes: &str,
+    ) -> Result<oauth::DeviceFlow, String> {
+        self.world
+            .tokens
+            .start_device(provider, device_url, token_url, client_id, scopes)
+    }
+
+    /// Poll a pending device authorization once.
+    pub fn oauth_poll_device(&self, provider: &str) -> Result<oauth::DeviceStatus, String> {
+        self.world.tokens.poll_device(provider)
+    }
+
+    /// Whether `provider` currently holds a usable (or refreshable) token-set.
+    pub fn oauth_is_authorized(&self, provider: &str) -> bool {
+        self.world.tokens.is_authorized(provider)
+    }
+
+    /// Whether a device authorization is awaiting the user's approval.
+    pub fn oauth_device_pending(&self, provider: &str) -> bool {
+        self.world.tokens.device_pending(provider)
+    }
+
+    /// Drop the tokens (and any pending authorization) for `provider`.
+    pub fn oauth_disconnect(&self, provider: &str) {
+        self.world.tokens.cancel_device(provider);
+        self.world.tokens.revoke(provider);
     }
 
     /// Call a module service method directly (host-side: diagnostics, or driving
