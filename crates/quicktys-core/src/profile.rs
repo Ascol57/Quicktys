@@ -217,6 +217,24 @@ mod tests {
         Dispatcher::new(runner, engine, state, Arc::new(RwLock::new(profiles)))
     }
 
+    /// Like [`setup`], but hands back the state store so a test can seed the
+    /// plugin state a filter reads.
+    fn setup_with_state(profile: Profile, recorder: Arc<Recorder>) -> (Dispatcher, Arc<StateStore>) {
+        let tmp_p = TempDir::new();
+        let engine = Arc::new(ExprEngine::new());
+        let state = Arc::new(StateStore::new());
+        let runner = Runner::with_state(engine.clone(), recorder, state.clone());
+        let mut profiles = ResourceStore::<Profile>::new(tmp_p.path());
+        profiles.upsert(profile).unwrap();
+        let d = Dispatcher::new(
+            runner,
+            engine,
+            state.clone(),
+            Arc::new(RwLock::new(profiles)),
+        );
+        (d, state)
+    }
+
     fn binding(filter: Option<&str>) -> TriggerBinding {
         TriggerBinding {
             trigger: "twitch.chat".into(),
@@ -244,6 +262,34 @@ mod tests {
         d.dispatch(TriggerEvent::new("twitch.chat", ctx(json!({ "user": "ada" }))))
             .await;
         assert_eq!(rec.actions(), vec![("say".into(), json!("hi ada"))]);
+    }
+
+    /// A filter must be able to look at plugin STATE, not just the event
+    /// payload. State is namespaced flat (`obs.scene`), which is not a usable
+    /// identifier, so both the plain path and the `@` spelling of the config
+    /// templating have to resolve.
+    #[tokio::test]
+    async fn filter_reads_dotted_plugin_state() {
+        for filter in [r#"obs.scene == "Intro""#, r#"@obs.scene == "Intro""#] {
+            let rec = Recorder::new();
+            let profile = Profile {
+                id: "main".into(),
+                name: None,
+                activation: None,
+                triggers: vec![binding(Some(filter))],
+            };
+            let (d, state) = setup_with_state(profile, rec.clone());
+
+            state.set("obs.scene", json!("Outro"));
+            d.dispatch(TriggerEvent::new("twitch.chat", ctx(json!({ "user": "ada" }))))
+                .await;
+            assert!(rec.actions().is_empty(), "{filter}: must not run on another scene");
+
+            state.set("obs.scene", json!("Intro"));
+            d.dispatch(TriggerEvent::new("twitch.chat", ctx(json!({ "user": "ada" }))))
+                .await;
+            assert_eq!(rec.actions().len(), 1, "{filter}: must run on the matching scene");
+        }
     }
 
     #[tokio::test]

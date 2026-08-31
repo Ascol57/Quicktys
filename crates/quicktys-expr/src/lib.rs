@@ -41,5 +41,5 @@ pub use coerce::coerce;
 pub use compile::CompiledExpr;
 pub use engine::ExprEngine;
 pub use error::ExprError;
-pub use eval::Context;
+pub use eval::{nest_context, Context};
 pub use value::{dynamic_to_json, json_to_dynamic};

@@ -194,7 +194,24 @@ start-of-string or after whitespace (so `a@b.com` is left alone); a lone `@path`
 — **Handlebars** (the `handlebars` crate), with the flat keys nested into a tree so
 `{{pear.title}}` / `{{#each pear.playlist}}…{{/each}}` work; missing values render empty. `@`
 runs first, then Handlebars. This is NOT Rhai — conditions/filters/loops stay Rhai `Expr` with
-no `{{ }}`. The editor renders template string fields (`schema.template`) with a highlighted
+no `{{ }}`.
+
+**Conditions & filters read state the same way (`if`, `wait-for until`, trigger filters,
+profile activation).** They are Rhai, and state is namespaced **flat** (`obs.scene`), which is
+not a usable identifier — `obs.scene` used to parse as a property read on a missing variable
+`obs` and blow up. So `ExprEngine::eval` now **nests dotted keys** through the shared
+`quicktys_expr::nest_context` (the very function the Handlebars layer uses, no longer
+duplicated in `template.rs`), and `compile()` **strips a leading `@`** outside string literals.
+Net effect: `obs.scene == "Intro"` and `@obs.scene == "Intro"` both work, so one spelling covers
+action fields, `if` conditions and filters. Watch out: **`=` is not `==`** in Rhai, and
+`eval_truthy` turns any compile/eval error into `false` — a typo silently disables the binding
+with no message. Because deps are ROOT identifiers (`obs`) while state keys are dotted,
+`StateStore::wait_until` matches a changed key against a dep by root segment; exact matching
+would have made `wait-for until` never wake. Tests: `eval.rs::dotted_state_keys_are_readable_as_paths`,
+`profile.rs::filter_reads_dotted_plugin_state`,
+`sequence_tests.rs::if_condition_reads_dotted_state_with_and_without_the_sigil`.
+
+The editor renders template string fields (`schema.template`) with a highlighted
 `@`/`{{`-autocomplete input (`TemplateInput.vue`; helper catalogue in `helpers.js`), fed by each plugin's declared `state` variables
 (now surfaced in `PluginInfo.state`). Covered by `sequence.rs` tests
 (`at_variable_and_handlebars_over_dotted_state`).

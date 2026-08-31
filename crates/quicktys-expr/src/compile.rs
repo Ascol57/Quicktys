@@ -36,10 +36,16 @@ impl CompiledExpr {
 
 impl ExprEngine {
     /// Compile a single expression, extracting its variable dependencies.
+    ///
+    /// The `@` sigil of the config templating (`@obs.scene`) is accepted and
+    /// stripped first, so one spelling works everywhere: what the editor's
+    /// autocomplete inserts into an action field also compiles in an `if`
+    /// condition or a trigger filter. The stored `source` stays what the user
+    /// wrote.
     pub fn compile(&self, source: &str) -> Result<CompiledExpr, ExprError> {
         let ast = self
             .raw()
-            .compile_expression(source)
+            .compile_expression(&strip_at_sigils(source))
             .map_err(|e| ExprError::Compile(e.to_string()))?;
         let deps = extract_deps(&ast);
         Ok(CompiledExpr {
@@ -53,6 +59,41 @@ impl ExprEngine {
     pub fn compile_expr(&self, expr: &quicktys_schema::Expr) -> Result<CompiledExpr, ExprError> {
         self.compile(expr.source())
     }
+}
+
+/// Drop the `@` sigil in front of a variable read, so `@obs.scene` compiles as
+/// `obs.scene`.
+///
+/// Only outside string literals, and only when an identifier actually follows —
+/// so an email in a string, a `@` used as an operator, or a lone `@` are left
+/// exactly as they are.
+fn strip_at_sigils(source: &str) -> String {
+    let mut out = String::with_capacity(source.len());
+    let mut chars = source.chars().peekable();
+    let mut quote: Option<char> = None;
+    let mut escaped = false;
+    while let Some(c) = chars.next() {
+        if let Some(q) = quote {
+            out.push(c);
+            if escaped {
+                escaped = false;
+            } else if c == '\\' && q != '`' {
+                escaped = true; // backtick strings are raw in Rhai
+            } else if c == q {
+                quote = None;
+            }
+            continue;
+        }
+        match c {
+            '"' | '\'' | '`' => {
+                quote = Some(c);
+                out.push(c);
+            }
+            '@' if matches!(chars.peek(), Some(n) if n.is_alphabetic() || *n == '_') => {}
+            _ => out.push(c),
+        }
+    }
+    out
 }
 
 /// Walk the AST and collect the names of (non-namespaced) variables read.

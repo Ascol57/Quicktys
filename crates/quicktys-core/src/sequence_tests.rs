@@ -200,6 +200,29 @@
         );
     }
 
+    /// The same state a template reads with `@pear.title` must be readable from
+    /// an `if` condition — with or without the sigil. Conditions are Rhai, where
+    /// a flat `pear.title` key is not an identifier, so the context is nested
+    /// before evaluation.
+    #[tokio::test]
+    async fn if_condition_reads_dotted_state_with_and_without_the_sigil() {
+        use crate::reactivity::StateStore;
+        for cond in [r#"pear.title == "Nightcall""#, r#"@pear.title == "Nightcall""#] {
+            let mock = MockInvoker::new();
+            let state = Arc::new(StateStore::new());
+            state.set("pear.title", json!("Nightcall"));
+            let runner = Runner::with_state(Arc::new(ExprEngine::new()), mock.clone(), state);
+
+            let root = Node::If {
+                cond: Expr::new(cond),
+                then: Box::new(action("p", "then", json!({}))),
+                otherwise: Some(Box::new(action("p", "else", json!({})))),
+            };
+            runner.run(&root, Context::new()).await.unwrap();
+            assert_eq!(mock.calls()[0].1, "then", "condition `{cond}` should be true");
+        }
+    }
+
     #[tokio::test]
     async fn if_takes_the_true_branch() {
         let mock = MockInvoker::new();

@@ -90,7 +90,17 @@ impl StateStore {
             loop {
                 match rx.recv().await {
                     Ok(key) => {
-                        let relevant = deps.is_empty() || deps.iter().any(|d| d == &key);
+                        // A dependency is a ROOT identifier (`obs`), because that
+                        // is what the expression engine sees once dotted keys
+                        // are nested — so a change to `obs.scene` must wake a
+                        // condition that depends on `obs`.
+                        let relevant = deps.is_empty()
+                            || deps.iter().any(|d| {
+                                key == *d
+                                    || (key.len() > d.len()
+                                        && key.starts_with(d.as_str())
+                                        && key.as_bytes()[d.len()] == b'.')
+                            });
                         if relevant && predicate() {
                             return true;
                         }

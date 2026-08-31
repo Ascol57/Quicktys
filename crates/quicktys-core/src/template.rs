@@ -276,23 +276,10 @@ fn render_str(source: &str, ctx: &Context) -> Result<String, String> {
 }
 
 /// Nest flat dotted keys (`pear.title`) into a tree for Handlebars path lookup.
+/// Shared with the expression engine, which needs the very same tree so a
+/// condition and a template read state identically.
 fn nest_context(ctx: &Context) -> Value {
-    let mut root = serde_json::Map::new();
-    for (key, value) in ctx {
-        let parts: Vec<&str> = key.split('.').collect();
-        let mut node = &mut root;
-        for part in &parts[..parts.len() - 1] {
-            let entry = node
-                .entry(part.to_string())
-                .or_insert_with(|| Value::Object(serde_json::Map::new()));
-            if !entry.is_object() {
-                *entry = Value::Object(serde_json::Map::new());
-            }
-            node = entry.as_object_mut().unwrap();
-        }
-        node.insert(parts[parts.len() - 1].to_string(), value.clone());
-    }
-    Value::Object(root)
+    Value::Object(quicktys_expr::nest_context(ctx))
 }
 
 /// Characters allowed inside one `@path` segment (keys may hold `-`, e.g.

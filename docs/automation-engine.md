@@ -56,6 +56,32 @@ Exposé comme un objet à Rhai, fusion de :
 > place, les plugins/modules exposent des **valeurs** via le state. La stdlib est
 > versionnée et étendue par les releases du cœur.
 
+**Décision (août 2026) — clés pointées et sigle `@` dans les conditions.** Le
+state est namespacé **à plat** (`obs.scene`, `pear.title`) : ce n'est pas un
+identifiant utilisable, et `obs.scene` était donc lu par Rhai comme un accès de
+propriété sur une variable `obs` inexistante → erreur → condition fausse. Deux
+corrections, qui font converger les trois syntaxes du produit :
+
+- `ExprEngine::eval` **imbrique les clés pointées** en arbre avant de peupler la
+  portée Rhai, via `quicktys_expr::nest_context` — exactement la fonction déjà
+  utilisée par la couche Handlebars, désormais partagée au lieu d'être dupliquée
+  dans `quicktys-core::template`. `obs.scene == "Intro"` fonctionne.
+- `ExprEngine::compile` **retire un `@` en tête de lecture de variable**, hors
+  littéraux de chaîne. `@obs.scene == "Intro"` fonctionne aussi, donc ce que
+  l'autocomplétion de l'éditeur insère dans un champ d'action se colle tel quel
+  dans une condition ou un filtre.
+
+Conséquence sur l'analyse statique (§1.5) : une dépendance reste un identifiant
+**racine** (`obs`), alors que les clés du state sont pointées. `StateStore::
+wait_until` compare donc une clé modifiée à une dépendance **par segment
+racine** ; une égalité stricte aurait empêché tout `wait-for until` sur du state
+de se réveiller.
+
+⚠️ Piège UX restant : en Rhai `=` est une affectation, `==` la comparaison, et
+`eval_truthy` transforme **toute** erreur de compilation ou d'évaluation en
+`false`. Une faute de frappe désactive donc silencieusement le binding, sans
+aucun message. À remonter dans l'éditeur (validation à la saisie).
+
 ### 1.4 Deux usages, une seule grammaire
 
 - **Champ typé** (ex. une `Duration` avec `template: true`) contenant **une seule
