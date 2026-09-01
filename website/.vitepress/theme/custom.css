@@ -262,13 +262,15 @@
 /* ========================================================================= */
 
 .qt-section {
-  max-width: 1152px;
-  margin: 0 auto;
-  padding: 72px 24px;
+  /* The landing body is already inside VitePress' `.container` (1152px with
+     24px of padding), so adding padding here would indent every section 24px
+     further than the hero headline. Vertical rhythm only. */
+  padding: 72px 0;
 }
 .qt-section + .qt-section {
   border-top: 1px solid var(--vp-c-divider);
 }
+.vp-doc .qt-section h2,
 .qt-section h2 {
   margin: 10px 0 0;
   padding: 0;
@@ -281,8 +283,9 @@
 }
 @media (max-width: 639px) {
   .qt-section {
-    padding: 52px 22px;
+    padding: 52px 0;
   }
+  .vp-doc .qt-section h2,
   .qt-section h2 {
     font-size: 27px;
   }
@@ -335,7 +338,8 @@
   text-transform: uppercase;
   color: var(--qt-tier-color);
 }
-.qt-tier h3 {
+.vp-doc .qt-card.qt-tier h3,
+.qt-card.qt-tier h3 {
   font-size: 21px;
   font-weight: 600;
   margin-bottom: 12px;
@@ -370,6 +374,7 @@
   border-color: color-mix(in srgb, var(--qt-violet) 55%, transparent);
   transform: translateY(-2px);
 }
+.vp-doc .qt-card h3,
 .qt-card h3 {
   margin: 0 0 8px;
   font-size: 16px;
@@ -440,9 +445,7 @@
 /* ------------------------------------------------------------------ status */
 
 .qt-status {
-  max-width: 1152px;
-  margin: 0 auto;
-  padding: 0 24px;
+  padding: 0;
 }
 .qt-status-inner {
   border: 1px solid var(--vp-c-divider);
