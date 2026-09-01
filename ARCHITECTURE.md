@@ -53,6 +53,46 @@
     (identifiant d'exception **personnalisé**, non enregistré auprès de SPDX).
   - **Reste à faire** : le texte du **CLA**, et la relecture juridique de
     l'ensemble.
+- **Affinage (décision, septembre 2026) — quatre régimes, pas deux.** Le mapping
+  « `crates/` = cœur AGPL » était trop grossier sur deux points, tranchés ici et
+  reportés dans [`COPYING.md`](COPYING.md) :
+  - **SDK invités en MIT** ([`LICENSE-SDK`](LICENSE-SDK)) : `quicktys-plugin-sdk`
+    et `quicktys-module-sdk` passent de l'AGPL du workspace à `license = "MIT"`.
+    Le §0(b) de l'exception les couvrait déjà (cf. ci-dessus, problème *GCC
+    Runtime Library*), mais résoudre par renvoi laissait la question ouverte à
+    chaque évolution du SDK ; MIT la supprime, et permet en prime de vendoriser
+    ou forker le SDK hors de Quicktys. Aucune obligation de copyleft ne peut plus
+    remonter par le SDK dans une extension fermée.
+  - **Outillage de commerce en propriétaire source-available** :
+    `quicktys-regserve` (serveur d'API du registre) et `quicktys-pack`
+    (empaquetage, **signature**, émission de licences) déclarent
+    `LicenseRef-Ascol57-Proprietary` et sont couverts par
+    [`LICENSE-EXTENSIONS`](LICENSE-EXTENSIONS) §1(b). **Ligne de partage
+    retenue : émettre vs vérifier.** Tout le côté *vérification* reste dans le
+    cœur AGPL — `quicktys-registry`, `quicktys-cert`, `quicktys-crypto`,
+    `quicktys-install` — parce que l'utilisateur doit pouvoir auditer ce que son
+    app accepte de croire, et parce que [`docs/drm.md`](docs/drm.md) §0 pose déjà
+    que le déchiffreur est ouvert (Kerckhoffs) et que le secret est dans les
+    clés. Ce qui se vend, c'est frapper les signatures et tenir le store.
+  - Inchangé : l'AGPL §13 s'applique toujours au **cœur**, donc un marketplace
+    *dérivé du cœur* reste forcé à l'open source ; ces deux crates n'y changent
+    rien.
+  - ⚠️ **Trou identifié, à trancher : `quicktys-schema` est lié dans chaque
+    extension.** Les deux SDK ré-exportent `quicktys_schema::Schema` (un plugin
+    écrit ses schémas avec), donc ce crate — resté **AGPL** — est compilé *dans*
+    chaque extension. C'est exactement le problème que le §0(b) de l'exception
+    règle pour les SDK, mais `quicktys-schema` n'y est **pas nommé**, et la
+    définition d'« Independent Extension » (§0(b) de l'exception) exige de ne
+    contenir aucun code du Programme hors ABI officielle. Passer les SDK en MIT
+    ne suffit donc pas à lui seul. Trois issues possibles :
+    1. **ajouter `quicktys-schema` au §0(b)** de l'exception (le plus petit
+       changement ; cohérent avec le §0(e) qui couvre déjà le *format* de schéma) ;
+    2. **passer `quicktys-schema` en MIT** comme les SDK (il est de toute façon
+       le vocabulaire partagé host↔extension, pas de la logique métier) ;
+    3. **scinder** un `quicktys-schema-types` minimal en MIT, le reste du crate
+       (validation, coercition) restant AGPL côté host.
+    Option 2 recommandée : c'est la même justification que pour les SDK, et ça
+    évite d'avoir à re-vérifier la liste du §0(b) à chaque nouveau crate partagé.
 
 ## 1. Objectifs et contraintes
 

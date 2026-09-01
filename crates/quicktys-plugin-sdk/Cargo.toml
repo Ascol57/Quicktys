@@ -2,7 +2,9 @@
 name = "quicktys-plugin-sdk"
 version.workspace = true
 edition.workspace = true
-license.workspace = true
+# Guest SDK: MIT, NOT the AGPL core licence — it is linked into every
+# extension. See LICENSE-SDK and COPYING.md.
+license = "MIT"
 description = "Guest-side SDK for writing Quicktys plugins in Rust (compiles to a WASM component)."
 
 [dependencies]

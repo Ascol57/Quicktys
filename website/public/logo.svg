@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Quicktys">
+  <defs>
+    <linearGradient id="qtbolt" x1="0.1" y1="0" x2="0.9" y2="1">
+      <stop offset="0%" stop-color="#9d84ff"/>
+      <stop offset="55%" stop-color="#7c5cff"/>
+      <stop offset="100%" stop-color="#37c8b0"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#qtbolt)" d="M20.6 1.5 5.2 18.1a.9.9 0 0 0 .66 1.51h6.28l-1.74 10.9a.55.55 0 0 0 .96.44l15.4-16.6a.9.9 0 0 0-.66-1.51h-6.28l1.74-10.9a.55.55 0 0 0-.96-.44Z"/>
+</svg>

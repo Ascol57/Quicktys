@@ -89,10 +89,18 @@ Copyright © 2026 Ascol57. Ce dépôt a **deux régimes** — voir
   ([`LICENSE-EXCEPTION`](LICENSE-EXCEPTION)) : une extension qui parle au cœur
   **uniquement via l'ABI officielle** n'est pas une œuvre dérivée et peut être
   **fermée et vendue** ;
+- **les SDK invités** (`quicktys-plugin-sdk`, `quicktys-module-sdk`) sont sous
+  **MIT** ([`LICENSE-SDK`](LICENSE-SDK)) : ils sont liés dans chaque extension,
+  donc aucune obligation de copyleft ne doit pouvoir remonter par eux ;
 - **les extensions livrées ici** (`plugins/`, `modules/`, `widgets/`) sont
   **propriétaires, source-available** — © Ascol57, tous droits réservés
   ([`LICENSE-EXTENSIONS`](LICENSE-EXTENSIONS)). Lisibles, compilables et
-  utilisables avec Quicktys ; ni redistribuables ni réutilisables.
+  utilisables avec Quicktys ; ni redistribuables ni réutilisables ;
+- **l'outillage de commerce** (`quicktys-regserve`, `quicktys-pack` — servir le
+  registre, signer, émettre des licences) est sous les mêmes termes
+  propriétaires. Le côté *vérification* (`quicktys-registry`, `quicktys-cert`,
+  `quicktys-crypto`, `quicktys-install`) reste, lui, dans le cœur AGPL : on doit
+  pouvoir auditer ce que l'app croit.
 
 L'**API** d'extension est libre pour tout le monde ; cette **implémentation**-ci
 ne l'est pas.

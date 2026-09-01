@@ -1,21 +1,44 @@
-                    QUICKTYS REFERENCE EXTENSIONS LICENCE
+              QUICKTYS REFERENCE EXTENSIONS & COMMERCE LICENCE
                       Proprietary — source-available
-                              Version 1.0
+                              Version 1.1
 
   Copyright (C) 2026 Ascol57. All rights reserved.
 
 
 1. WHAT THIS COVERS
 
-This licence governs the extensions distributed in this repository under the
-directories `plugins/`, `modules/` and `widgets/`, including their source code,
-manifests, configuration schemas, `lang/` translation files, HTML/CSS/JS assets
-and icons (collectively, "the Extensions").
+This licence governs two sets of proprietary works published in this
+repository:
+
+  (a) THE EXTENSIONS — everything under the directories `plugins/`, `modules/`
+      and `widgets/`, including their source code, manifests, configuration
+      schemas, `lang/` translation files, HTML/CSS/JS assets and icons.
+
+  (b) THE COMMERCE TOOLING — the crates that produce and serve the Quicktys
+      marketplace rather than consume it:
+
+          crates/quicktys-regserve   the registry API server
+          crates/quicktys-pack       the packaging, signing and licence-issuing
+                                     tool
+
+Throughout the remainder of this licence, "the Extensions" means both sets: the
+Commerce Tooling is governed by exactly the same terms.
 
 It does NOT cover the Quicktys core, which is licensed separately under the GNU
 Affero General Public License version 3 with the Quicktys Extension Exception.
-See the LICENSE, LICENSE-EXCEPTION and COPYING.md files at the root of this
-repository.
+In particular, the *consumer* side of the marketplace stays in the core and
+stays AGPL: `quicktys-registry` (fetching, resolving and verifying an index),
+`quicktys-cert` and `quicktys-crypto` (verifying signature chains, entitlements
+and encrypted payloads) and `quicktys-install`. Verification must remain open —
+users have to be able to audit what the app trusts, and a client-side DRM whose
+decryptor is secret is security theatre. What is proprietary here is the
+*issuing* side: minting signatures and licences, and running the store.
+
+It does NOT cover the guest SDK crates `quicktys-plugin-sdk` and
+`quicktys-module-sdk` either, which are MIT — see LICENSE-SDK.
+
+See the LICENSE, LICENSE-EXCEPTION, LICENSE-SDK and COPYING.md files at the
+root of this repository for the full map.
 
 SPDX identifier used in the Extensions' manifests:
 

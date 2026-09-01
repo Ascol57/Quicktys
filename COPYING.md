@@ -6,8 +6,10 @@ fichiers `LICENSE*`.
 
 | Ce que c'est | Où | Licence | Texte |
 | --- | --- | --- | --- |
-| **Le cœur Quicktys** | `crates/`, `frontend/`, `wit/`, `lang/`, `scripts/`, `docs/`, la racine | **AGPL-3.0-only** **+** *Quicktys Extension Exception* | [`LICENSE`](LICENSE) + [`LICENSE-EXCEPTION`](LICENSE-EXCEPTION) |
+| **Le cœur Quicktys** | `crates/` (sauf ci-dessous), `frontend/`, `wit/`, `lang/`, `scripts/`, `docs/`, la racine | **AGPL-3.0-only** **+** *Quicktys Extension Exception* | [`LICENSE`](LICENSE) + [`LICENSE-EXCEPTION`](LICENSE-EXCEPTION) |
+| **Les SDK invités** | `crates/quicktys-plugin-sdk`, `crates/quicktys-module-sdk` | **MIT** | [`LICENSE-SDK`](LICENSE-SDK) |
 | **Les extensions de référence** | `plugins/`, `modules/`, `widgets/` | **Propriétaire, source-available** — tous droits réservés | [`LICENSE-EXTENSIONS`](LICENSE-EXTENSIONS) |
+| **L'outillage de commerce** | `crates/quicktys-regserve`, `crates/quicktys-pack` | **Propriétaire, source-available** — tous droits réservés | [`LICENSE-EXTENSIONS`](LICENSE-EXTENSIONS) §1(b) |
 | **Vos extensions tierces** | hors de ce dépôt | **la licence de votre choix**, y compris fermée et payante | l'exception vous y autorise |
 
 ## Le cœur : AGPL-3.0 + exception d'extension
@@ -43,6 +45,45 @@ AGPL-3.0-only WITH quicktys-extension-exception
 
 ⚠️ Identifiant d'exception **personnalisé**, pas un identifiant SPDX enregistré :
 un outil qui valide strictement le SPDX peut le rejeter.
+
+## Les SDK invités : MIT
+
+`quicktys-plugin-sdk` et `quicktys-module-sdk` sont **sous MIT**, pas sous la
+licence du cœur ([`LICENSE-SDK`](LICENSE-SDK)). Raison : ils sont **liés
+statiquement dans chaque extension**. L'exception d'extension les inscrit déjà
+dans l'« Official Extension ABI » (§0(b)), donc les lier n'a jamais rendu une
+extension dérivée du cœur — mais les passer en MIT supprime la question au lieu
+de la résoudre par renvoi, et permet en plus de les vendoriser, forker ou
+réutiliser hors de Quicktys.
+
+Conséquence pratique : vous pouvez écrire, vendre et distribuer une extension
+**fermée** sans qu'aucune obligation de copyleft ne remonte par le SDK.
+
+## L'outillage de commerce : propriétaire
+
+Le marketplace a deux moitiés, et elles ne sont **pas** sous la même licence.
+
+- **Le côté consommateur reste dans le cœur, sous AGPL** :
+  [`quicktys-registry`](crates/quicktys-registry) (chercher, résoudre,
+  télécharger), [`quicktys-cert`](crates/quicktys-cert) et
+  [`quicktys-crypto`](crates/quicktys-crypto) (vérifier les chaînes de signature,
+  les entitlements, les payloads chiffrés),
+  [`quicktys-install`](crates/quicktys-install). La **vérification doit rester
+  ouverte** : l'utilisateur doit pouvoir auditer ce que son app accepte de faire
+  confiance, et un DRM client dont le déchiffreur est secret n'est que du théâtre
+  de sécurité (cf. [`docs/drm.md`](docs/drm.md) §0).
+- **Le côté émetteur est propriétaire, source-available** :
+  [`quicktys-regserve`](crates/quicktys-regserve) (le serveur d'API du registre)
+  et [`quicktys-pack`](crates/quicktys-pack) (empaqueter, **signer**, émettre des
+  licences). Mêmes termes que les extensions de référence
+  ([`LICENSE-EXTENSIONS`](LICENSE-EXTENSIONS) §1(b)) : lisibles et compilables
+  pour le développement local, **ni redistribuables ni réutilisables**.
+
+Autrement dit : n'importe qui peut vérifier ce que le store signe ; frapper des
+signatures et faire tourner le store, non.
+
+⚠️ L'AGPL §13 continue de s'appliquer au **cœur** : un marketplace *dérivé du
+cœur* doit publier ses sources. Ce qui précède ne concerne que ces deux crates-ci.
 
 ## Les extensions de ce dépôt : à moi, mais visibles
 
@@ -90,10 +131,16 @@ This repository is **dual-regime**:
   ([`LICENSE-EXCEPTION`](LICENSE-EXCEPTION)). Any extension that talks to the core
   *solely through the official ABI* is not a derivative work, and may be licensed
   and **sold under any terms, including closed source**.
+- **The guest SDKs** (`quicktys-plugin-sdk`, `quicktys-module-sdk`) — **MIT**
+  ([`LICENSE-SDK`](LICENSE-SDK)), because they are linked into every extension.
 - **The reference extensions shipped here** (`plugins/`, `modules/`, `widgets/`) —
   **proprietary, source-available**, © Ascol57, all rights reserved. Readable,
   buildable and usable with Quicktys; **not** redistributable or reusable. See
   [`LICENSE-EXTENSIONS`](LICENSE-EXTENSIONS).
+- **The commerce tooling** (`quicktys-regserve`, `quicktys-pack`) — same
+  proprietary source-available terms. The *verification* side
+  (`quicktys-registry`, `quicktys-cert`, `quicktys-crypto`, `quicktys-install`)
+  deliberately stays in the AGPL core.
 
 The public extension **API** is free for anyone to build against; this particular
 **implementation** of it is not free to copy.

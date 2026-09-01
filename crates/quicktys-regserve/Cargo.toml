@@ -2,7 +2,9 @@
 name = "quicktys-regserve"
 version.workspace = true
 edition.workspace = true
-license.workspace = true
+# Commerce side (registry API / signing & packaging tooling): proprietary,
+# source-available, (C) Ascol57 — see LICENSE-EXTENSIONS and COPYING.md.
+license = "LicenseRef-Ascol57-Proprietary"
 
 [[bin]]
 name = "quicktys-regserve"
