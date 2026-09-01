@@ -2,6 +2,14 @@ import { defineConfig } from "vitepress";
 
 const REPO = "https://github.com/Ascol57/Quicktys";
 
+// The repository is private while the licence texts are under legal review, but
+// the published site is public. Flip this to `true` the day the repo opens: it
+// restores the "edit this page" links, which are pointless (and 404) until then.
+// The in-prose links to source files stay as they are — they are correct URLs,
+// they simply do not resolve for anyone yet; the notices on the landing page and
+// the installation page say so.
+const REPO_PUBLIC = false;
+
 // ---------------------------------------------------------------------------
 // Sidebars. Each locale gets the same structure with its own prefix + labels.
 // A `p` prefix of "" is the English root, "/fr" the French locale.
@@ -272,10 +280,12 @@ export default defineConfig({
           { text: "Contributing", link: "/contributing/architecture", activeMatch: "/contributing/" },
         ],
         sidebar: sidebar("", EN),
-        editLink: {
-          pattern: `${REPO}/edit/main/website/:path`,
-          text: "Edit this page on GitHub",
-        },
+        ...(REPO_PUBLIC && {
+          editLink: {
+            pattern: `${REPO}/edit/main/website/:path`,
+            text: "Edit this page on GitHub",
+          },
+        }),
         footer: {
           message: "Core AGPL-3.0 + Quicktys Extension Exception. Shipped extensions © Ascol57.",
           copyright: "© 2026 Ascol57",
@@ -299,10 +309,12 @@ export default defineConfig({
           { text: "Contribuer", link: "/fr/contributing/architecture", activeMatch: "/fr/contributing/" },
         ],
         sidebar: sidebar("/fr", FR),
-        editLink: {
-          pattern: `${REPO}/edit/main/website/:path`,
-          text: "Modifier cette page sur GitHub",
-        },
+        ...(REPO_PUBLIC && {
+          editLink: {
+            pattern: `${REPO}/edit/main/website/:path`,
+            text: "Modifier cette page sur GitHub",
+          },
+        }),
         footer: {
           message: "Cœur AGPL-3.0 + exception d'extension Quicktys. Extensions livrées © Ascol57.",
           copyright: "© 2026 Ascol57",
