@@ -1,3 +1,7 @@
+---
+description: "Construire des overlays de stream dans l'éditeur WYSIWYG de Quicktys, avec de vrais aperçus en direct et des guides d'aimantation, puis les afficher via une source navigateur OBS."
+---
+
 # Overlays
 
 Un **overlay** est une page de widgets qu'OBS affiche comme source navigateur. On

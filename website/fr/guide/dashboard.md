@@ -1,3 +1,7 @@
+---
+description: "Construire un tableau de bord Quicktys : ajouter, déplacer, redimensionner et configurer des widgets, le trigger Bouton, et pourquoi un compte à rebours est décompté par son widget."
+---
+
 # Tableau de bord
 
 Le tableau de bord est une grille de **widgets** — les boîtes qui vous montrent ce

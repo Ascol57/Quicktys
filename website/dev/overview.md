@@ -1,3 +1,7 @@
+---
+description: "The Quicktys extension model: plugin, module and widget, what each one may import, the JSON-over-WIT ABI rule, and how extension bundles are laid out."
+---
+
 # The extension model
 
 Everything in Quicktys that talks to the outside world is an extension. There are

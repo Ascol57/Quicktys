@@ -1,3 +1,7 @@
+---
+description: "Toutes les intégrations livrées avec Quicktys : Twitch, OBS Studio, Pear Desktop, Discord, son et synthèse vocale, overlays, alertes, comptes à rebours, entrées et commandes shell."
+---
+
 # Intégrations
 
 Ce qui est livré aujourd'hui, ce que chaque chose demande, et ce qu'elle apporte.

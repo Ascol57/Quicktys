@@ -1,3 +1,7 @@
+---
+description: "Write a certified Quicktys module: system capabilities, services and events, socket drivers, OAuth, and why you must never authorise inside a poll loop."
+---
+
 # Write a module
 
 A module is a **driver**: how to talk to OBS, to Twitch, to the soundcard, to the

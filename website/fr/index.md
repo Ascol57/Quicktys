@@ -1,4 +1,7 @@
 ---
+title: "Quicktys — l'automatisation de stream, rebâtie en Rust"
+titleTemplate: false
+description: "L'automatisation de stream pour OBS, Twitch et tout ce qui gravite autour. Une app de bureau Rust et Tauri où chaque intégration est une extension WebAssembly isolée."
 layout: home
 
 hero:
@@ -33,6 +36,12 @@ hero:
     intégrations restantes, et le service d'activation en ligne. La
     <a href="/Quicktys/fr/contributing/roadmap">roadmap</a> donne l'état honnête
     de chaque jalon.
+    <br><br>
+    <strong>Le dépôt n'est pas encore ouvert.</strong> Les textes de licence sont
+    chez un avocat avant l'ouverture du code : les liens vers les fichiers source
+    de ce site, et le clonage, ne fonctionnent donc pas pour l'instant. Tout le
+    reste est complet et exact — cette documentation décrit le code tel qu'il est
+    aujourd'hui.
   </div>
 </div>
 

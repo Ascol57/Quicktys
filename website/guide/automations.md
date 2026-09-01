@@ -1,3 +1,7 @@
+---
+description: "The Quicktys automation node tree: actions, parallel branches with join policies, bounded loops, waits, try and retry, local variables and action queues."
+---
+
 # Automations
 
 An automation is a **tree of typed nodes**. Not a list of actions with a couple

@@ -1,9 +1,21 @@
+---
+description: "Installer Quicktys sous Linux, macOS ou Windows : prérequis, cible wasm32-wasip2, clés de développement, et comment construire et lancer depuis un clone nu."
+---
+
 # Installation
 
 Quicktys n'est pas encore distribué sous forme d'installeur signé : aujourd'hui,
 on l'installe en le construisant. C'est moins pénible que ça en a l'air — un
 script par OS installe tous les prérequis et génère les clés de développement, un
 second construit et lance le tout.
+
+::: danger Le dépôt n'est pas encore public
+Les textes de licence sont chez un avocat avant l'ouverture du code : **le
+`git clone` ci-dessous ne fonctionnera pas encore pour vous**, ni les liens vers
+les fichiers source ailleurs sur ce site. Cette page est publiée dès maintenant
+pour que la documentation soit prête le jour de l'ouverture ; les étapes
+elles-mêmes sont exactes et testées.
+:::
 
 ::: warning Pré-1.0
 Il n'y a pas encore de binaires de release. Prévoyez d'avoir une chaîne Rust et

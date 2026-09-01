@@ -1,3 +1,7 @@
+---
+description: "Écrire un module Quicktys certifié : capacités système, services et events, drivers socket, OAuth, et pourquoi il ne faut jamais autoriser dans une boucle de poll."
+---
+
 # Écrire un module
 
 Un module est un **driver** : comment parler à OBS, à Twitch, à la carte son, au

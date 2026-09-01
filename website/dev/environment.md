@@ -1,3 +1,7 @@
+---
+description: "Set up a Quicktys extension toolchain: the wasm32-wasip2 target, why extensions sit outside the host workspace, building bundles, and the test suites."
+---
+
 # Dev environment
 
 ## Prerequisites

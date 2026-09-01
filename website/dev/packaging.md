@@ -1,3 +1,7 @@
+---
+description: "Package, sign and publish a Quicktys extension: the .qtpkg format, signature chains, certification, running a static registry, and paid licences."
+---
+
 # Package & publish
 
 Getting an extension from a directory on your disk to something someone else can

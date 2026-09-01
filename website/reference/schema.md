@@ -1,3 +1,7 @@
+---
+description: "The Quicktys schema types that generate forms and validate ABI payloads: strings, numbers, durations, colours, ranges, toggles and resource references."
+---
+
 # Schema types
 
 A **schema** is the self-contained description of one field. It drives three

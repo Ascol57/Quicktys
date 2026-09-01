@@ -1,3 +1,7 @@
+---
+description: "Contribute to the Quicktys interface: slot buttons, module-contributed tabs, the scoped postMessage bridge, and the Vue proxy trap that silently breaks it."
+---
+
 # UI contributions
 
 Extensions can add to the app's interface in two ways: a **slot contribution**

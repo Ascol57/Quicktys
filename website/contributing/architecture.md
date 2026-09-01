@@ -1,3 +1,7 @@
+---
+description: "The Quicktys architecture: sixteen host crates, the wasmtime runtime, the Rhai expression engine, and the reasoning recorded behind each decision."
+---
+
 # Architecture
 
 The binding reference is [`ARCHITECTURE.md`](https://github.com/Ascol57/Quicktys/blob/main/ARCHITECTURE.md)

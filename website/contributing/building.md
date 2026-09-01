@@ -1,3 +1,7 @@
+---
+description: "Build Quicktys from source: the two build domains, the frontend, the ABI integration test suites, the pinned versions, and the project conventions."
+---
+
 # Building from source
 
 ## Quick start

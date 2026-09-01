@@ -1,3 +1,7 @@
+---
+description: "Construire sa première automatisation Quicktys en dix minutes : un bouton de tableau de bord, un trigger lié à une séquence, puis une réaction au chat Twitch en direct."
+---
+
 # Première automatisation
 
 Dix minutes, sans compte, sans OBS. On va faire en sorte qu'un bouton du tableau

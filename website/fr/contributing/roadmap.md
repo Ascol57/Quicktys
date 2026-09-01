@@ -1,3 +1,7 @@
+---
+description: "L'état honnête de chaque jalon de Quicktys, du noyau host et des deux ABI d'extension jusqu'à la marketplace et au portage de masse restant."
+---
+
 # Roadmap
 
 La migration depuis [CastMate](https://github.com/LordTocs/CastMate) est

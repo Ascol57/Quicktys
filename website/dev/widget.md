@@ -1,3 +1,7 @@
+---
+description: "Write a Quicktys widget: bundle.json, the config schema, the postMessage bridge, preview pages, and the sandbox rules that govern fonts and network access."
+---
+
 # Write a widget
 
 A widget is the third extension type and the easiest to write: **no Rust, no

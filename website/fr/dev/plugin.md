@@ -1,3 +1,7 @@
+---
+description: "Écrire un plugin Quicktys en Rust : le manifeste, les schémas, actions, triggers, état réactif, stockage, et l'appel des services d'un module certifié."
+---
+
 # Écrire un plugin
 
 Un plugin est la moitié visible d'une intégration : il déclare des **actions**,

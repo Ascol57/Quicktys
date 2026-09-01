@@ -1,3 +1,7 @@
+---
+description: "Write a Quicktys plugin in Rust: the manifest, schemas, actions, triggers, reactive state, storage, and calling a certified module's services."
+---
+
 # Write a plugin
 
 A plugin is the user-facing half of an integration: it declares **actions**,

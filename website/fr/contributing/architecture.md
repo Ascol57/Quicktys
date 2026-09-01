@@ -1,3 +1,7 @@
+---
+description: "L'architecture de Quicktys : seize crates host, le runtime wasmtime, le moteur d'expressions Rhai, et le raisonnement consigné derrière chaque décision."
+---
+
 # Architecture
 
 La référence qui fait foi est

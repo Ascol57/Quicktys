@@ -1,3 +1,7 @@
+---
+description: "Empaqueter, signer et publier une extension Quicktys : le format .qtpkg, les chaînes de signature, la certification, un registre statique, et les licences payantes."
+---
+
 # Empaqueter & publier
 
 Comment faire passer une extension d'un dossier sur votre disque à quelque chose

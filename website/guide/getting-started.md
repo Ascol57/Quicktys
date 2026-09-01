@@ -1,3 +1,7 @@
+---
+description: "Build your first Quicktys automation in ten minutes: a dashboard button, a trigger bound to a sequence, then a reaction to a live Twitch chat."
+---
+
 # Your first automation
 
 Ten minutes, no account, no OBS. We will make a button on the dashboard do

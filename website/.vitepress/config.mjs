@@ -2,6 +2,13 @@ import { defineConfig } from "vitepress";
 
 const REPO = "https://github.com/Ascol57/Quicktys";
 
+// Where the site is actually served. Verified live: ascol57.github.io 301s to
+// this apex, and the project page resolves under /Quicktys/. Canonical URLs,
+// hreflang alternates, Open Graph URLs and the sitemap are all derived from
+// these two constants — change them here and nowhere else.
+const SITE = "https://constant.rusche.fr";
+const BASE = "/Quicktys/";
+
 // The repository is private while the licence texts are under legal review, but
 // the published site is public. Flip this to `true` the day the repo opens: it
 // restores the "edit this page" links, which are pointless (and 404) until then.
@@ -216,18 +223,98 @@ const FR = {
   cLicense: "Licences",
 };
 
+
+// --------------------------------------------------------------------------
+// Structured data. Two shapes only: the landing describes the product, every
+// documentation page describes where it sits. Anything more would be schema
+// for schema's sake.
+// --------------------------------------------------------------------------
+const EN_SEO = {
+  homeTitle: "Quicktys — stream automation, rebuilt in Rust",
+  fallbackDescription:
+    "Stream automation for OBS, Twitch and everything around them, built on Rust, Tauri and sandboxed WebAssembly extensions.",
+  imageAlt: "Quicktys — stream automation, rebuilt in Rust",
+  // Section label + the page the navbar's own link points at. Google requires
+  // an `item` URL on every breadcrumb entry except the last, and there are no
+  // section index pages — so a section resolves to the same entry point the
+  // navigation uses, which is truthful rather than invented.
+  sections: {
+    guide: ["Guide", "guide/what-is-quicktys"],
+    dev: ["Develop", "dev/overview"],
+    reference: ["Reference", "reference/worlds"],
+    contributing: ["Contributing", "contributing/architecture"],
+  },
+};
+
+const FR_SEO = {
+  homeTitle: "Quicktys — l'automatisation de stream, rebâtie en Rust",
+  fallbackDescription:
+    "L'automatisation de stream pour OBS, Twitch et tout ce qui gravite autour, bâtie sur Rust, Tauri et des extensions WebAssembly isolées.",
+  imageAlt: "Quicktys — l'automatisation de stream, rebâtie en Rust",
+  sections: {
+    guide: ["Guide", "guide/what-is-quicktys"],
+    dev: ["Développer", "dev/overview"],
+    reference: ["Référence", "reference/worlds"],
+    contributing: ["Contribuer", "contributing/architecture"],
+  },
+};
+
+const softwareLd = (L, url, image) => ({
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Quicktys",
+  description: L.fallbackDescription,
+  url,
+  image,
+  applicationCategory: "MultimediaApplication",
+  operatingSystem: "Windows, macOS, Linux",
+  author: { "@type": "Person", name: "Ascol57" },
+  offers: { "@type": "Offer", price: "0", priceCurrency: "EUR" },
+  license: "https://www.gnu.org/licenses/agpl-3.0.html",
+  softwareHelp: url,
+});
+
+const breadcrumbLd = (bare, isFr, url, pageData) => {
+  const L = isFr ? FR_SEO : EN_SEO;
+  const home = SITE + BASE + (isFr ? "fr/" : "");
+  const prefix = BASE + (isFr ? "fr/" : "");
+  const section = L.sections[bare.split("/")[0]];
+  const items = [{ "@type": "ListItem", position: 1, name: "Quicktys", item: home }];
+  // Skip the section level when the page *is* the section's entry point, which
+  // would otherwise produce two consecutive entries with the same URL.
+  if (section && section[1] !== bare) {
+    items.push({
+      "@type": "ListItem",
+      position: 2,
+      name: section[0],
+      item: SITE + prefix + section[1],
+    });
+  }
+  items.push({
+    "@type": "ListItem",
+    position: items.length + 1,
+    name: pageData.frontmatter.title || pageData.title,
+    item: url,
+  });
+  return { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: items };
+};
+
 export default defineConfig({
   title: "Quicktys",
-  base: "/Quicktys/",
+  base: BASE,
   cleanUrls: true,
+  // The dev readme and the screenshot checklist are working documents, not
+  // pages: without this they compile into the site and land in the sitemap.
+  srcExclude: ["README.md", "public/**"],
   lastUpdated: true,
   ignoreDeadLinks: [/^https?:\/\/localhost/, /^https?:\/\/127\.0\.0\.1/],
 
+  sitemap: { hostname: SITE + BASE },
+
   head: [
-    ["link", { rel: "icon", href: "/Quicktys/logo.svg", type: "image/svg+xml" }],
+    ["link", { rel: "icon", href: BASE + "logo.svg", type: "image/svg+xml" }],
     ["meta", { name: "theme-color", content: "#7c5cff" }],
-    ["meta", { property: "og:type", content: "website" }],
-    ["meta", { property: "og:title", content: "Quicktys — stream automation, rebuilt" }],
+    ["meta", { name: "author", content: "Ascol57" }],
     // Display + utility faces. Inter (body) already ships with VitePress.
     ["link", { rel: "preconnect", href: "https://fonts.googleapis.com" }],
     ["link", { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: "" }],
@@ -265,6 +352,74 @@ export default defineConfig({
     search: { provider: "local" },
     socialLinks: [{ icon: "github", link: REPO }],
     outline: [2, 3],
+  },
+
+
+  // ---------------------------------------------------------------------------
+  // Per-page SEO head. VitePress emits <title> and <meta name="description">
+  // from the frontmatter on its own; everything that needs to know the page's
+  // absolute URL — canonical, hreflang alternates, Open Graph, JSON-LD — has to
+  // be built here, because only this hook knows which file is being rendered.
+  // ---------------------------------------------------------------------------
+  transformPageData(pageData) {
+    const rel = pageData.relativePath;
+    const isFr = rel === "fr/index.md" || rel.startsWith("fr/");
+
+    // 'guide/installation.md' -> 'guide/installation' ; 'index.md' -> ''
+    const bare = rel
+      .replace(/^fr\//, "")
+      .replace(/\.md$/, "")
+      .replace(/(^|\/)index$/, "$1");
+
+    const enUrl = SITE + BASE + bare;
+    const frUrl = SITE + BASE + "fr/" + bare;
+    const url = isFr ? frUrl : enUrl;
+    const isHome = bare === "";
+
+    const L = isFr ? FR_SEO : EN_SEO;
+    const title = isHome
+      ? L.homeTitle
+      : `${pageData.frontmatter.title || pageData.title} — Quicktys`;
+    const description =
+      pageData.frontmatter.description || L.fallbackDescription;
+    const image = SITE + BASE + (isFr ? "og-fr.png" : "og.png");
+
+    const head = [
+      ["link", { rel: "canonical", href: url }],
+      // A bilingual site has to declare both sides of every pair, and each page
+      // must also point at itself — otherwise Google treats the set as partial.
+      ["link", { rel: "alternate", hreflang: "en", href: enUrl }],
+      ["link", { rel: "alternate", hreflang: "fr", href: frUrl }],
+      ["link", { rel: "alternate", hreflang: "x-default", href: enUrl }],
+
+      ["meta", { property: "og:type", content: isHome ? "website" : "article" }],
+      ["meta", { property: "og:site_name", content: "Quicktys" }],
+      ["meta", { property: "og:url", content: url }],
+      ["meta", { property: "og:title", content: title }],
+      ["meta", { property: "og:description", content: description }],
+      ["meta", { property: "og:image", content: image }],
+      ["meta", { property: "og:image:width", content: "1200" }],
+      ["meta", { property: "og:image:height", content: "630" }],
+      ["meta", { property: "og:image:alt", content: L.imageAlt }],
+      ["meta", { property: "og:locale", content: isFr ? "fr_FR" : "en_US" }],
+      [
+        "meta",
+        { property: "og:locale:alternate", content: isFr ? "en_US" : "fr_FR" },
+      ],
+
+      ["meta", { name: "twitter:card", content: "summary_large_image" }],
+      ["meta", { name: "twitter:title", content: title }],
+      ["meta", { name: "twitter:description", content: description }],
+      ["meta", { name: "twitter:image", content: image }],
+    ];
+
+    head.push([
+      "script",
+      { type: "application/ld+json" },
+      JSON.stringify(isHome ? softwareLd(L, url, image) : breadcrumbLd(bare, isFr, url, pageData)),
+    ]);
+
+    pageData.frontmatter.head = [...(pageData.frontmatter.head || []), ...head];
   },
 
   locales: {

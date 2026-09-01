@@ -1,3 +1,7 @@
+---
+description: "Installer plugins et widgets depuis un registre Quicktys signé : résolution de dépendances, vérification de signature, consentement des capacités, mises à jour et licences payantes."
+---
+
 # Marketplace
 
 L'onglet Marketplace est l'endroit où l'on récupère plugins et widgets. Il parle à

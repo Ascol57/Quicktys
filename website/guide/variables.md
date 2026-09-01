@@ -1,3 +1,7 @@
+---
+description: "The three expression languages in Quicktys: @path and Handlebars templating in action fields, and sandboxed Rhai in conditions, filters and values."
+---
+
 # Variables & templating
 
 There are **three** places you type an expression in Quicktys, and they do not

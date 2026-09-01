@@ -1,3 +1,7 @@
+---
+description: "Monter une chaîne d'outils d'extension Quicktys : la cible wasm32-wasip2, pourquoi les extensions sont hors du workspace host, construire les bundles, et les suites de tests."
+---
+
 # Environnement de dev
 
 ## Prérequis

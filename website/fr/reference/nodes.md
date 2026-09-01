@@ -1,3 +1,7 @@
+---
+description: "Référence de chaque nœud d'automatisation Quicktys : action, block, parallel, timeline, if, switch, loop, wait-for, try, let, set, return, break et continue."
+---
+
 # Nœuds d'automatisation
 
 Une automatisation est un arbre de nœuds typés, sérialisé en YAML avec un

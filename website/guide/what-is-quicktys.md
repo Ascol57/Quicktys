@@ -1,3 +1,7 @@
+---
+description: "What Quicktys is, its three tiers of extension trust, and what it changes versus CastMate: a real automation model, analysable expressions, translations everywhere."
+---
+
 # What is Quicktys?
 
 Quicktys is a desktop application that reacts to things happening around your

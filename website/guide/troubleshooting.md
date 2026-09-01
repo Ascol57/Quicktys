@@ -1,3 +1,7 @@
+---
+description: "Why a Quicktys trigger never fires, an action does nothing, a browser source stays blank or an extension change has no effect — and how to fix each one."
+---
+
 # Troubleshooting
 
 ## A trigger never fires

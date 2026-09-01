@@ -1,3 +1,7 @@
+---
+description: "Les profils lient des triggers à des séquences et s'allument d'un bloc. Conditions d'activation, contexte de trigger et filtres Rhai, expliqués."
+---
+
 # Profils & triggers
 
 Un **profil** est un ensemble nommé de liaisons trigger→séquence, qu'on peut

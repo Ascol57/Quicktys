@@ -1,3 +1,7 @@
+---
+description: "Connect Twitch to Quicktys through the OAuth device code flow, plus OBS websocket and Pear Desktop. What works without an account, and what does not."
+---
+
 # Connecting accounts
 
 Some things need to know who you are. Reading a Twitch chat does not; posting to

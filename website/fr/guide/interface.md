@@ -1,3 +1,7 @@
+---
+description: "Visite de la fenêtre Quicktys — tableau de bord, profils, automatisations, variables, marketplace et réglages — et pourquoi chaque formulaire est généré depuis un schéma."
+---
+
 # L'interface
 
 Quicktys est une application de bureau à onglets. Une barre latérale à gauche

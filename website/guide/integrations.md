@@ -1,3 +1,7 @@
+---
+description: "Every integration shipped with Quicktys: Twitch, OBS Studio, Pear Desktop, Discord, sound and TTS, overlays, alerts, countdowns, input and shell commands."
+---
+
 # Integrations
 
 What ships today, what each one needs, and what it gives you. Exhaustive lists of

@@ -1,3 +1,7 @@
+---
+description: "Les outils en ligne de commande de Quicktys : build-bundles, gen-keys, run, quicktys-pack, quicktys-regserve et quicktys-migrate, avec toutes leurs options."
+---
+
 # Outils en ligne de commande
 
 ## `scripts/build-bundles.sh`

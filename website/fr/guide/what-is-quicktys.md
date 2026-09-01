@@ -1,3 +1,7 @@
+---
+description: "Ce qu'est Quicktys, ses trois niveaux de confiance d'extension, et ce qui change face à CastMate : un vrai modèle d'automatisation, des expressions analysables, des traductions partout."
+---
+
 # Qu'est-ce que Quicktys ?
 
 Quicktys est une application de bureau qui réagit à ce qui se passe autour de

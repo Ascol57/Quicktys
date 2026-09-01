@@ -1,3 +1,7 @@
+---
+description: "L'arbre de nœuds d'automatisation de Quicktys : actions, branches parallèles avec politique de jointure, boucles bornées, attentes, try/retry, variables et files d'action."
+---
+
 # Automatisations
 
 Une automatisation est un **arbre de nœuds typés**. Pas une liste d'actions avec

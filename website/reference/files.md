@@ -1,3 +1,7 @@
+---
+description: "Where Quicktys stores profiles, automations, installed extensions, consent, tokens and state, plus the ports and custom URI schemes it uses."
+---
+
 # Files & data directory
 
 ## The data directory

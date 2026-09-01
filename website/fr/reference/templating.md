@@ -1,3 +1,7 @@
+---
+description: "Tous les helpers Handlebars des champs d'action Quicktys — maths, trigonométrie, texte, comparaison et helpers de bloc — plus la syntaxe @chemin et l'échappement."
+---
+
 # Helpers de templating
 
 Les champs de config d'action qui acceptent le templating comprennent deux

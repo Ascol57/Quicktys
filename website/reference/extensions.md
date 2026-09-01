@@ -1,3 +1,7 @@
+---
+description: "The complete surface of every plugin, module and widget shipped with Quicktys: actions, triggers, state, services, events and configuration options."
+---
+
 # Shipped extensions
 
 Everything in the Quicktys repository, with its complete surface. For a

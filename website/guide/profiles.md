@@ -1,3 +1,7 @@
+---
+description: "Profiles bind triggers to sequences and switch on and off as a whole. Activation conditions, trigger context and Rhai filters, explained."
+---
+
 # Profiles & triggers
 
 A **profile** is a named set of trigger→sequence bindings that can be switched on

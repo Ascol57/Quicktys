@@ -1,3 +1,7 @@
+---
+description: "Chaque capacité du host Quicktys avec sa signature WIT et son état d'implémentation : logging, storage, reactivity, modules, net, audio, input, process et les autres."
+---
+
 # Capacités du host
 
 Toutes les interfaces qu'une extension peut importer, depuis

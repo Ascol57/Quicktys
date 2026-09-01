@@ -1,3 +1,7 @@
+---
+description: "Build a Quicktys dashboard: add, move, resize and configure widgets, the Button trigger, and why a countdown is ticked by its widget rather than the host."
+---
+
 # Dashboard
 
 The Dashboard is a grid of **widgets** — the boxes that show you what is going on

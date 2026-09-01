@@ -1,3 +1,7 @@
+---
+description: "La surface complète de chaque plugin, module et widget livré avec Quicktys : actions, triggers, état, services, events et options de configuration."
+---
+
 # Extensions livrées
 
 Tout ce que contient le dépôt Quicktys, avec sa surface complète. Pour une vue

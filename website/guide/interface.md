@@ -1,3 +1,7 @@
+---
+description: "A tour of the Quicktys window — dashboard, profiles, automations, variables, marketplace and settings — and why every form is generated from a schema."
+---
+
 # The interface
 
 Quicktys is a tabbed desktop application. A sidebar on the left lists the

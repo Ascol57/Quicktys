@@ -1,3 +1,7 @@
+---
+description: "The four Quicktys licence regimes: an AGPL core with an extension exception, MIT guest SDKs, and proprietary reference extensions and commerce tooling."
+---
+
 # Licensing
 
 The repository has **four** licence regimes. Which one applies depends on what

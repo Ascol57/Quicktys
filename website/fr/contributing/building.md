@@ -1,3 +1,7 @@
+---
+description: "Compiler Quicktys depuis les sources : les deux domaines de build, le frontend, les suites de tests d'intégration de l'ABI, les versions épinglées et les conventions."
+---
+
 # Compiler depuis les sources
 
 ## Démarrage rapide

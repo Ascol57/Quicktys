@@ -1,3 +1,7 @@
+---
+description: "Les quatre régimes de licence de Quicktys : un cœur AGPL avec exception d'extension, des SDK invités MIT, et des extensions et outils de commerce propriétaires."
+---
+
 # Licences
 
 Le dépôt comporte **quatre** régimes de licence. Lequel s'applique dépend de ce

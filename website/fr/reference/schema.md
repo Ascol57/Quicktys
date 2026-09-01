@@ -1,3 +1,7 @@
+---
+description: "Les types de schéma de Quicktys qui génèrent les formulaires et valident les payloads de l'ABI : chaînes, nombres, durées, couleurs, intervalles, bascules et références."
+---
+
 # Types de schéma
 
 Un **schéma** est la description auto-portée d'un champ. Il pilote trois choses à

@@ -1,3 +1,7 @@
+---
+description: "Où Quicktys range profils, automatisations, extensions installées, consentements, jetons et état, ainsi que les ports et schémas d'URI qu'il utilise."
+---
+
 # Fichiers & dossier de données
 
 ## Le dossier de données

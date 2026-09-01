@@ -1,3 +1,7 @@
+---
+description: "Écrire un widget Quicktys : bundle.json, le schéma de configuration, le pont postMessage, les pages d'aperçu, et les règles d'isolation sur les polices et le réseau."
+---
+
 # Écrire un widget
 
 Un widget est le troisième type d'extension, et le plus simple à écrire : **pas de

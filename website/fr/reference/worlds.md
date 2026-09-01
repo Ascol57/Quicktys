@@ -1,3 +1,7 @@
+---
+description: "Les worlds WIT de Quicktys : ce qu'un plugin et un module importent et exportent, l'ordre du cycle de vie au chargement, et comment les appels franchissent le bac à sable."
+---
+
 # Worlds & cycle de vie
 
 Les contrats d'extension sont des interfaces WIT du paquet

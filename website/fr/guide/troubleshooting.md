@@ -1,3 +1,7 @@
+---
+description: "Pourquoi un trigger Quicktys ne se déclenche jamais, une action ne fait rien, une source navigateur reste vide ou une modification d'extension n'a aucun effet — et comment corriger."
+---
+
 # Dépannage
 
 ## Un trigger ne se déclenche jamais

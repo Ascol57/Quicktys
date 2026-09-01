@@ -1,3 +1,7 @@
+---
+description: "Install plugins and widgets from a signed Quicktys registry: dependency resolution, signature verification, capability consent, updates and paid licences."
+---
+
 # Marketplace
 
 The Marketplace tab is where you get plugins and widgets. It talks to a

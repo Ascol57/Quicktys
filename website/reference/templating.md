@@ -1,3 +1,7 @@
+---
+description: "Every Handlebars helper available in Quicktys action fields — maths, trigonometry, text, comparison and block helpers — plus the @path syntax and escaping."
+---
+
 # Templating helpers
 
 Action config fields that opt into templating accept two syntaxes. `@` is

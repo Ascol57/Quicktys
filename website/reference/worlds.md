@@ -1,3 +1,7 @@
+---
+description: "The Quicktys WIT worlds: what a plugin and a module import and export, the lifecycle order at load, and how calls cross the sandbox boundary."
+---
+
 # Worlds & lifecycle
 
 The extension contracts are WIT interfaces in package **`quicktys:api@0.2.0`**,

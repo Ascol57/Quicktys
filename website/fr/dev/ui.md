@@ -1,3 +1,7 @@
+---
+description: "Enrichir l'interface de Quicktys : boutons de slot, onglets contribués par un module, le pont postMessage scopé, et le piège des proxies Vue qui le casse silencieusement."
+---
+
 # Contributions d'UI
 
 Les extensions peuvent enrichir l'interface de deux façons : une **contribution de

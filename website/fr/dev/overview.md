@@ -1,3 +1,7 @@
+---
+description: "Le modèle d'extension de Quicktys : plugin, module et widget, ce que chacun peut importer, la règle d'ABI JSON sur WIT, et la structure des bundles d'extension."
+---
+
 # Le modèle d'extension
 
 Tout ce qui, dans Quicktys, parle au monde extérieur est une extension. Il en

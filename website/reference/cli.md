@@ -1,3 +1,7 @@
+---
+description: "Quicktys command-line tools: build-bundles, gen-keys, run, quicktys-pack, quicktys-regserve and quicktys-migrate, with every flag and environment variable."
+---
+
 # Command-line tools
 
 ## `scripts/build-bundles.sh`

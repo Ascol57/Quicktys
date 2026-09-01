@@ -1,3 +1,7 @@
+---
+description: "Reference for every Quicktys automation node: action, block, parallel, timeline, if, switch, loop, wait-for, try, let, set, return, break and continue."
+---
+
 # Automation nodes
 
 An automation is a tree of typed nodes, serialised to YAML with a `kind`
